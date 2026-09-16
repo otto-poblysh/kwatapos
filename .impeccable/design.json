@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-17T00:40:00Z",
+  "title": "Design System: Kwata POS",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Pitch Black", "canonical": "#000000" },
+      "surface-primary": { "role": "neutral", "displayName": "Surface White", "canonical": "#FFFFFF" },
+      "surface-secondary": { "role": "neutral", "displayName": "Off-White Backdrop", "canonical": "#F2F2F7" }
+    },
+    "shadows": [
+      { "name": "floating-ambient", "value": "0 8px 32px rgba(0,0,0,0.08)", "purpose": "Reserved exclusively for floating elements like the bottom navigation pill." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Used for main calls to action.",
+      "html": "<button class=\"ds-btn-primary\">Add Order</button>",
+      "css": ".ds-btn-primary { background: #000000; color: #FFFFFF; padding: 16px 24px; font-weight: 600; border: none; border-radius: 9999px; transition: transform 0.2s; cursor: pointer; } .ds-btn-primary:active { transform: scale(0.96); }"
+    },
+    {
+      "name": "Hero Card",
+      "kind": "card",
+      "refersTo": "card-default",
+      "description": "High emphasis card for primary values like Balance.",
+      "html": "<div class=\"ds-hero-card\"><h2>Your Balance</h2><div class=\"amount\">$245.00</div></div>",
+      "css": ".ds-hero-card { background: #000000; color: #FFFFFF; padding: 24px; border-radius: 24px; } .ds-hero-card h2 { margin: 0 0 8px; font-weight: 500; font-size: 14px; opacity: 0.8; } .ds-hero-card .amount { margin: 0; font-size: 36px; font-weight: 700; }"
+    },
+    {
+      "name": "Standard Card",
+      "kind": "card",
+      "refersTo": "card-default",
+      "description": "White background card for normal content.",
+      "html": "<div class=\"ds-card\"><h3>Recent Tracking</h3></div>",
+      "css": ".ds-card { background: #FFFFFF; color: #111111; padding: 20px; border-radius: 24px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "High-Contrast Native Utility",
+    "overview": "The Kwata POS interface draws heavy inspiration from modern iOS paradigms: it is stark, highly legible, and relies on contrast rather than color floods to establish hierarchy. The aesthetic is clean and surgical, using deep blacks and stark whites to guide the user's eye instantly to key actions—perfect for a fast-paced bar environment. It embraces generous corner radii, pill-shaped buttons, and floating navigation to feel undeniably native to iOS.",
+    "keyCharacteristics": [
+      "Stark monochromatic foundation (black and white) with sparse semantic color accents.",
+      "Large, highly legible typographic hierarchy utilizing system fonts.",
+      "Exaggerated corner radii (24px for cards, pills for buttons).",
+      "Flat surface layering relying on borders and contrast rather than heavy drop shadows."
+    ],
+    "rules": [
+      { "name": "The One Voice Rule", "body": "The primary accent (Black in light mode, White in dark mode) is used on ≤10% of any given screen. Its rarity and high contrast are the point.", "section": "colors" },
+      { "name": "The Number Prominence Rule", "body": "Financial figures (balances, totals) are always treated as Display text and set at least two steps larger than surrounding text.", "section": "typography" },
+      { "name": "The Flat-By-Default Rule", "body": "Surfaces are flat at rest. Drop shadows are banished from standard cards and buttons to maintain a clean, modern look.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use Pitch Black as the highest-emphasis background for the single most important card on a screen.",
+      "Do use large, bold typography for numerical data and prices.",
+      "Do ensure all interactive areas are at least 44x44px for fast, error-free tapping."
+    ],
+    "donts": [
+      "Don't use drop shadows on standard content cards. Rely on background contrast (white on off-white).",
+      "Don't use sharp corners (< 12px radius) on primary layout containers.",
+      "Don't flood the screen with color. Keep the background monochromatic and use green/red only for semantic meaning."
+    ]
+  }
+}
