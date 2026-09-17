@@ -5,7 +5,7 @@ use serde_json::Value;
 // We will test the router directly without spinning up a TCP listener
 #[tokio::test]
 async fn test_health_check_returns_200_and_json() {
-    let app = backend::app(); // 'app' function doesn't exist yet!
+    let app = backend::app();
 
     let response = app
         .oneshot(Request::builder().uri("/api/health").body(Body::empty()).unwrap())
