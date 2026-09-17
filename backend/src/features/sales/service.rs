@@ -2,7 +2,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::features::inventory::repository::{
-    decrement_inventory_tx, get_all_products_with_inventory, Product, ProductWithInventory,
+    decrement_inventory_tx, get_all_products_with_inventory, get_product_by_id_tx,
+    ProductWithInventory,
 };
 
 use super::{
@@ -55,20 +56,20 @@ pub async fn create_cash_order(
         }
     }
 
+    // Sort items by product_id to ensure deterministic lock acquisition and prevent deadlocks
+    let mut items = payload.items;
+    items.sort_by_key(|item| item.product_id);
+
     let mut tx = pool.begin().await.map_err(SalesError::Database)?;
 
     let mut total_amount: f64 = 0.0;
-    let mut resolved_items: Vec<(Uuid, i32, f64)> = Vec::with_capacity(payload.items.len());
+    let mut resolved_items: Vec<(Uuid, i32, f64)> = Vec::with_capacity(items.len());
 
-    for item in &payload.items {
-        let product = sqlx::query_as::<_, Product>(
-            "SELECT id, name, price, category, created_at FROM products WHERE id = $1",
-        )
-        .bind(item.product_id)
-        .fetch_optional(&mut *tx)
-        .await
-        .map_err(SalesError::Database)?
-        .ok_or(SalesError::ProductNotFound(item.product_id))?;
+    for item in &items {
+        let product = get_product_by_id_tx(&mut tx, item.product_id)
+            .await
+            .map_err(SalesError::Database)?
+            .ok_or(SalesError::ProductNotFound(item.product_id))?;
 
         match decrement_inventory_tx(&mut tx, item.product_id, item.quantity).await {
             Ok(_) => {}

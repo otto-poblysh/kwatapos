@@ -46,6 +46,18 @@ pub async fn get_product_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Product
     .await
 }
 
+pub async fn get_product_by_id_tx<'a>(
+    tx: &mut sqlx::Transaction<'a, sqlx::Postgres>,
+    id: Uuid,
+) -> Result<Option<Product>, sqlx::Error> {
+    sqlx::query_as::<_, Product>(
+        "SELECT id, name, price, category, created_at FROM products WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(&mut **tx)
+    .await
+}
+
 pub async fn get_inventory(pool: &PgPool, product_id: Uuid) -> Result<Option<Inventory>, sqlx::Error> {
     sqlx::query_as::<_, Inventory>(
         "SELECT product_id, quantity, updated_at FROM inventory WHERE product_id = $1",
