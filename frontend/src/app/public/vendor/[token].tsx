@@ -429,7 +429,7 @@ const styles = StyleSheet.create({
   },
   itemCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: '#E5E5EA',
     padding: 18,
