@@ -59,6 +59,18 @@ pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Customer>, sql
     .await
 }
 
+pub async fn find_by_id_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    id: Uuid,
+) -> Result<Option<Customer>, sqlx::Error> {
+    sqlx::query_as::<_, Customer>(
+        "SELECT id, name, phone_number, created_at FROM customers WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(&mut **tx)
+    .await
+}
+
 pub async fn create_credit_tx(
     tx: &mut Transaction<'_, Postgres>,
     customer_id: Uuid,
