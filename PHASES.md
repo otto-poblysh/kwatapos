@@ -80,7 +80,19 @@ To ensure steady progress and allow for regular team reviews, the development of
 
 ---
 
-## Phase 7: Final Polish, Optimization & Launch Prep
+## Phase 7: Advanced Admin & Granular RBAC
+**Goal:** Empower the business owner with full control over the system, staff permissions, and core data.
+**Tasks:**
+- Implement granular permissions schema (`permissions`, `role_permissions`, `user_permissions`).
+- Build Admin CRUD for Users and Roles, including permission toggling.
+- Build Admin CRUD for Core Features (Products, Customers, Inventory adjustments).
+- Implement backend middleware to enforce granular permissions on API routes.
+**Deliverable (Demo):** 
+> The Super Admin navigates to the "Team" dashboard, creates a new custom role "Weekend Staff" with restricted permissions, assigns it to a new user, and then updates the price of a product in the "Catalog" dashboard.
+
+---
+
+## Phase 8: Final Polish, Optimization & Launch Prep
 **Goal:** Ensure the app is production-ready, beautiful, and performant.
 **Tasks:**
 - Conduct a rigorous audit against `DESIGN.md` (checking padding, typography, shadow removals).
