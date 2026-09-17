@@ -69,6 +69,7 @@ describe('Direct Expenses & Camera Receipt Uploads', () => {
       refreshToken: 'refresh',
       isLoading: false,
       login: jest.fn(),
+      loginCustomer: jest.fn(),
       logout: jest.fn(),
     });
 

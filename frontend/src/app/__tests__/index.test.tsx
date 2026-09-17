@@ -27,6 +27,7 @@ describe('Index Route', () => {
       refreshToken: null,
       isLoading: true,
       login: jest.fn(),
+      loginCustomer: jest.fn(),
       logout: jest.fn(),
     });
 
@@ -41,6 +42,7 @@ describe('Index Route', () => {
       refreshToken: null,
       isLoading: false,
       login: jest.fn(),
+      loginCustomer: jest.fn(),
       logout: jest.fn(),
     });
 
@@ -55,6 +57,7 @@ describe('Index Route', () => {
       refreshToken: 'refresh',
       isLoading: false,
       login: jest.fn(),
+      loginCustomer: jest.fn(),
       logout: jest.fn(),
     });
 
@@ -69,6 +72,7 @@ describe('Index Route', () => {
       refreshToken: 'refresh',
       isLoading: false,
       login: jest.fn(),
+      loginCustomer: jest.fn(),
       logout: jest.fn(),
     });
 
@@ -83,10 +87,26 @@ describe('Index Route', () => {
       refreshToken: 'refresh',
       isLoading: false,
       login: jest.fn(),
+      loginCustomer: jest.fn(),
       logout: jest.fn(),
     });
 
     render(<Index />);
     expect(screen.getByText('Redirect to /(sales)')).toBeTruthy();
+  });
+
+  it('redirects customer to customer dashboard', () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: '4', email: '+237690000000', role: 'customer' },
+      accessToken: 'token',
+      refreshToken: 'refresh',
+      isLoading: false,
+      login: jest.fn(),
+      loginCustomer: jest.fn(),
+      logout: jest.fn(),
+    });
+
+    render(<Index />);
+    expect(screen.getByText('Redirect to /customer/dashboard')).toBeTruthy();
   });
 });

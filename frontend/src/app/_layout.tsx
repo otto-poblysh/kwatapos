@@ -13,19 +13,30 @@ function NavigationGuard() {
 
     const inAuthGroup = segments[0] === '(auth)';
     const isPublic = segments[0] === 'public';
+    const isCustomerGroup = segments[0] === 'customer';
 
     if (!user) {
-      if (!inAuthGroup && !isPublic) {
+      if (isCustomerGroup) {
+        if (segments[1] !== 'login') {
+          router.replace('/customer/login');
+        }
+      } else if (!inAuthGroup && !isPublic) {
         router.replace('/(auth)/login');
       }
+    } else if (user.role === 'customer') {
+      if (!isCustomerGroup || segments[1] === 'login') {
+        router.replace('/customer/dashboard');
+      }
     } else {
-      if (inAuthGroup) {
+      if (inAuthGroup || isCustomerGroup) {
         if (user.role === 'admin') {
           router.replace('/(admin)');
         } else if (user.role === 'manager') {
           router.replace('/(manager)');
-        } else {
+        } else if (user.role === 'sales') {
           router.replace('/(sales)');
+        } else {
+          router.replace('/(auth)/login');
         }
       } else if (segments[0] === '(admin)' && user.role !== 'admin') {
         if (user.role === 'manager') {

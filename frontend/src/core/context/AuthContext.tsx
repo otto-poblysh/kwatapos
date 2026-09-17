@@ -15,6 +15,7 @@ export interface AuthContextType {
   refreshToken: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginCustomer: (phoneNumber: string, pin: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -123,6 +124,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     restoreSession();
   }, []);
 
+  const persistSession = async (data: {
+    access_token: string;
+    refresh_token: string;
+    user: User;
+  }) => {
+    await authStorage.setItem(ACCESS_TOKEN_KEY, data.access_token);
+    await authStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
+    await authStorage.setItem(USER_KEY, JSON.stringify(data.user));
+
+    setAccessToken(data.access_token);
+    setRefreshToken(data.refresh_token);
+    setUser(data.user);
+  };
+
   const login = async (email: string, password: string): Promise<void> => {
     const baseUrl = getApiBaseUrl();
     const res = await fetch(`${baseUrl}/api/auth/login`, {
@@ -147,13 +162,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data = await res.json();
-    await authStorage.setItem(ACCESS_TOKEN_KEY, data.access_token);
-    await authStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
-    await authStorage.setItem(USER_KEY, JSON.stringify(data.user));
+    await persistSession(data);
+  };
 
-    setAccessToken(data.access_token);
-    setRefreshToken(data.refresh_token);
-    setUser(data.user);
+  const loginCustomer = async (phoneNumber: string, pin: string): Promise<void> => {
+    const baseUrl = getApiBaseUrl();
+    const res = await fetch(`${baseUrl}/api/auth/customer`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ phone_number: phoneNumber, pin }),
+    });
+
+    if (!res.ok) {
+      let errorMessage = 'Invalid phone number or PIN';
+      try {
+        const errJson = await res.json();
+        if (errJson?.error) {
+          errorMessage = errJson.error;
+        }
+      } catch {
+        // use default error message
+      }
+      throw new Error(errorMessage);
+    }
+
+    const data = await res.json();
+    await persistSession(data);
   };
 
   const logout = async (): Promise<void> => {
@@ -174,6 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refreshToken,
         isLoading,
         login,
+        loginCustomer,
         logout,
       }}
     >

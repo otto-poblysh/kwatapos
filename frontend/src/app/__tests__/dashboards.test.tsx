@@ -26,6 +26,7 @@ describe('Dashboard Screens', () => {
         refreshToken: 'refresh',
         isLoading: false,
         login: jest.fn(),
+        loginCustomer: jest.fn(),
         logout: mockLogout,
       });
 
@@ -48,6 +49,7 @@ describe('Dashboard Screens', () => {
         refreshToken: 'refresh',
         isLoading: false,
         login: jest.fn(),
+        loginCustomer: jest.fn(),
         logout: mockLogout,
       });
 
@@ -71,6 +73,7 @@ describe('Dashboard Screens', () => {
         refreshToken: 'refresh',
         isLoading: false,
         login: jest.fn(),
+        loginCustomer: jest.fn(),
         logout: mockLogout,
       });
 

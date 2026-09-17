@@ -128,6 +128,38 @@ describe('useAuth Hook', () => {
     expect(result.current.user).toBeNull();
   });
 
+  it('logs in a customer with phone and PIN', async () => {
+    const mockUser = { id: 'c1', email: '+237690000000', role: 'customer' };
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        access_token: 'customer_access',
+        refresh_token: 'customer_refresh',
+        user: mockUser,
+      }),
+    } as any);
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.loginCustomer('+237690000000', '0000');
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'http://127.0.0.1:3014/api/auth/customer',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ phone_number: '+237690000000', pin: '0000' }),
+      })
+    );
+    expect(result.current.user).toEqual(mockUser);
+    expect(result.current.accessToken).toBe('customer_access');
+  });
+
   it('logs out and clears session from storage', async () => {
     await authStorage.setItem(ACCESS_TOKEN_KEY, 'saved_access_token');
     await authStorage.setItem(

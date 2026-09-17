@@ -26,6 +26,10 @@ export default function Index() {
     return <Redirect href="/(manager)" />;
   }
 
+  if (user.role === 'customer') {
+    return <Redirect href="/customer/dashboard" />;
+  }
+
   return <Redirect href="/(sales)" />;
 }
 

@@ -54,6 +54,7 @@ describe('Open Orders Dashboard', () => {
       refreshToken: 'refresh-abc',
       isLoading: false,
       login: jest.fn(),
+      loginCustomer: jest.fn(),
       logout: mockLogout,
     });
 
