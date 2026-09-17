@@ -85,9 +85,10 @@ pub async fn create_cash_order(
         resolved_items.push((item.product_id, item.quantity, unit_price));
     }
 
-    let order = repository::create_order_tx(&mut tx, "cash", total_amount, "completed")
-        .await
-        .map_err(SalesError::Database)?;
+    let order =
+        repository::create_order_tx(&mut tx, None, Some("cash"), total_amount, "completed")
+            .await
+            .map_err(SalesError::Database)?;
 
     let mut item_responses = Vec::with_capacity(resolved_items.len());
     for (product_id, quantity, unit_price) in resolved_items {
@@ -114,7 +115,7 @@ pub async fn create_cash_order(
 
     Ok(OrderResponse {
         id: order.id,
-        payment_method: order.payment_method,
+        payment_method: order.payment_method.unwrap_or_else(|| "cash".to_string()),
         status: order.status,
         total_amount: order.total_amount,
         items: item_responses,

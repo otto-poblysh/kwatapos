@@ -345,7 +345,9 @@ async fn test_post_orders_cash_multi_item_success() {
         .unwrap()
         .unwrap();
     assert_eq!(db_order.total_amount, Decimal::from(5500));
-    assert_eq!(db_order.payment_method, "cash");
+    assert_eq!(db_order.payment_method.as_deref(), Some("cash"));
+    assert_eq!(db_order.status, "completed");
+    assert_eq!(db_order.order_name, None);
 
     let db_items = backend::features::sales::repository::get_order_items_by_order_id(&pool, order_id)
         .await
@@ -440,3 +442,79 @@ async fn test_post_orders_cash_nonexistent_product_returns_400() {
     let json: Value = serde_json::from_slice(&body).unwrap();
     assert!(json["error"].as_str().unwrap().contains("not found"));
 }
+
+#[tokio::test]
+async fn test_open_orders_repository_lifecycle() {
+    let (_app, pool) = test_app_and_pool().await;
+
+    // 1. Create open order with name
+    let tab_name = "Table 4 - Tab";
+    let order1 = backend::features::sales::repository::create_open_order(&pool, Some(tab_name))
+        .await
+        .expect("Failed to create open order");
+
+    assert_eq!(order1.order_name.as_deref(), Some(tab_name));
+    assert_eq!(order1.payment_method, None);
+    assert_eq!(order1.status, "open");
+    assert_eq!(order1.total_amount, Decimal::ZERO);
+
+    // 2. Create open order inside transaction without name
+    let mut tx = pool.begin().await.expect("Failed to begin transaction");
+    let order2 = backend::features::sales::repository::create_open_order_tx(&mut tx, None)
+        .await
+        .expect("Failed to create open order tx");
+    tx.commit().await.expect("Failed to commit");
+
+    assert_eq!(order2.order_name, None);
+    assert_eq!(order2.payment_method, None);
+    assert_eq!(order2.status, "open");
+    assert_eq!(order2.total_amount, Decimal::ZERO);
+
+    // 3. get_open_orders contains both
+    let open_orders = backend::features::sales::repository::get_open_orders(&pool)
+        .await
+        .expect("Failed to get open orders");
+    assert!(open_orders.iter().any(|o| o.id == order1.id));
+    assert!(open_orders.iter().any(|o| o.id == order2.id));
+
+    // 4. Update order total in transaction
+    let mut tx = pool.begin().await.expect("Failed to begin tx");
+    let new_total = Decimal::new(3500, 0); // 3500.00
+    backend::features::sales::repository::update_order_total_tx(&mut tx, order1.id, new_total)
+        .await
+        .expect("Failed to update order total");
+    tx.commit().await.expect("Failed to commit update");
+
+    let updated = backend::features::sales::repository::get_order_by_id(&pool, order1.id)
+        .await
+        .expect("Failed to get order")
+        .expect("Order not found");
+    assert_eq!(updated.total_amount, new_total);
+
+    // 5. Settle order
+    let mut tx = pool.begin().await.expect("Failed to begin tx");
+    let settled = backend::features::sales::repository::settle_order_tx(&mut tx, order1.id, "cash")
+        .await
+        .expect("Failed to settle order");
+    tx.commit().await.expect("Failed to commit settle");
+
+    assert_eq!(settled.id, order1.id);
+    assert_eq!(settled.status, "completed");
+    assert_eq!(settled.payment_method.as_deref(), Some("cash"));
+    assert_eq!(settled.total_amount, new_total);
+
+    // 6. Verify order1 is no longer in open orders
+    let open_orders_after = backend::features::sales::repository::get_open_orders(&pool)
+        .await
+        .expect("Failed to get open orders after settlement");
+    assert!(!open_orders_after.iter().any(|o| o.id == order1.id));
+    assert!(open_orders_after.iter().any(|o| o.id == order2.id));
+
+    // Cleanup
+    let _ = sqlx::query("DELETE FROM orders WHERE id IN ($1, $2)")
+        .bind(order1.id)
+        .bind(order2.id)
+        .execute(&pool)
+        .await;
+}
+
