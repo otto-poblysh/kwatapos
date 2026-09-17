@@ -33,6 +33,7 @@ pub fn app_with_state(state: AppState) -> Router {
     Router::new()
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .route("/api/health", get(health_check))
+        .nest("/api/auth", features::auth::controller::router())
         .layer(CorsLayer::permissive())
         .with_state(state)
 }
