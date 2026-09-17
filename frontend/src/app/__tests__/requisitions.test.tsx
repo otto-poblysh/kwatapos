@@ -1,7 +1,7 @@
 import React from 'react';
+import { Share } from 'react-native';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
 import RequisitionsScreen from '../(manager)/requisitions';
-import * as Sharing from 'expo-sharing';
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
@@ -105,6 +105,7 @@ describe('Requisitions Screen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     global.fetch = jest.fn();
+    jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' } as any);
   });
 
   it('renders header with back button and title', async () => {
@@ -292,7 +293,7 @@ describe('Requisitions Screen', () => {
     });
   });
 
-  it('shares a draft requisition via Sharing API and clipboard fallback', async () => {
+  it('shares a draft requisition via Share API', async () => {
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce({
         ok: true,
@@ -332,9 +333,10 @@ describe('Requisitions Screen', () => {
       );
     });
 
-    expect(Sharing.shareAsync).toHaveBeenCalledWith(
-      'http://127.0.0.1:3011/public/vendor/tok-1'
-    );
+    expect(Share.share).toHaveBeenCalledWith({
+      message: 'Please confirm order prices for Kwata POS: http://127.0.0.1:3011/public/vendor/tok-1',
+      url: 'http://127.0.0.1:3011/public/vendor/tok-1',
+    });
   });
 
   it('opens delivery modal and submits delivery confirmation', async () => {
@@ -436,5 +438,81 @@ describe('Requisitions Screen', () => {
         expect.objectContaining({ method: 'POST' })
       );
     });
+  });
+
+  it('invalidates details cache when requisitions are refreshed after delivery', async () => {
+    (global.fetch as jest.Mock)
+      // 1. Initial list
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [mockRequisitions[1]], // req-2 (accepted)
+      })
+      // 2. Open delivery modal (fetches req-2 detail)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockDetailReq2,
+      })
+      // 3. Deliver post
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ...mockDetailReq2, status: 'delivered' }),
+      })
+      // 4. Refresh list on delivery success
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          {
+            ...mockRequisitions[1],
+            status: 'delivered',
+          },
+        ],
+      })
+      // 5. Expand items on delivered requisition: verifies cache was invalidated and fresh fetch occurs
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ...mockDetailReq2,
+          status: 'delivered',
+          items: [
+            {
+              ...mockDetailReq2.items[0],
+              received_quantity: 30,
+            },
+          ],
+        }),
+      });
+
+    render(<RequisitionsScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('receive-delivery-btn')).toBeTruthy();
+    });
+
+    // Receive delivery
+    fireEvent.press(screen.getByTestId('receive-delivery-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('confirm-delivery-btn')).toBeTruthy();
+    });
+    fireEvent.press(screen.getByTestId('confirm-delivery-btn'));
+
+    // Requisitions refreshed after delivery
+    await waitFor(() => {
+      expect(screen.getByText('Delivered')).toBeTruthy();
+    });
+
+    // Expand items on the updated requisition
+    const expandBtn = screen.getByTestId('expand-btn-req-2');
+    fireEvent.press(expandBtn);
+
+    // Detail fetch should occur because cache was cleared
+    await waitFor(() => {
+      expect(screen.getByText(/Received: 30 \/ 30/i)).toBeTruthy();
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/requisitions/req-2')
+    );
+    expect(global.fetch).toHaveBeenCalledTimes(5);
   });
 });

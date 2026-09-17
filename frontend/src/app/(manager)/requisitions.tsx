@@ -7,10 +7,10 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import * as Sharing from 'expo-sharing';
 import { getApiBaseUrl } from '../../core/context/AuthContext';
 import { RequisitionDraftModal } from '../../features/requisitions/components/RequisitionDraftModal';
 import { DeliveryModal } from '../../features/requisitions/components/DeliveryModal';
@@ -68,6 +68,7 @@ export default function RequisitionsScreen({ apiBaseUrl }: RequisitionsScreenPro
   const fetchRequisitions = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setDetailsCache({});
     try {
       const res = await fetch(`${baseUrl}/api/requisitions`);
       if (!res.ok) {
@@ -132,15 +133,10 @@ export default function RequisitionsScreen({ apiBaseUrl }: RequisitionsScreenPro
         }
         showToast('Vendor link copied to clipboard!');
       } else {
-        const available = await Sharing.isAvailableAsync().catch(() => false);
-        if (available) {
-          await Sharing.shareAsync(vendorUrl);
-        } else {
-          if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-            await navigator.clipboard.writeText(vendorUrl);
-          }
-          showToast('Vendor link copied to clipboard!');
-        }
+        await Share.share({
+          message: `Please confirm order prices for Kwata POS: ${vendorUrl}`,
+          url: vendorUrl,
+        });
       }
 
       fetchRequisitions();

@@ -173,4 +173,66 @@ describe('VendorPublicForm', () => {
     // Submit button should be hidden after confirmation
     expect(screen.queryByTestId('confirm-submit-prices-btn')).toBeNull();
   });
+
+  it('validates that all item confirmed prices are greater than 0 before submitting', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockRequisition,
+    });
+
+    render(<VendorPublicForm />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('price-input-item-1')).toBeTruthy();
+    });
+
+    // Set item 1 price to 0
+    fireEvent.changeText(screen.getByTestId('price-input-item-1'), '0');
+
+    // Attempt submission
+    const submitBtn = screen.getByTestId('confirm-submit-prices-btn');
+    fireEvent.press(submitBtn);
+
+    // Validation error banner should appear
+    await waitFor(() => {
+      expect(screen.getByTestId('vendor-submit-error')).toBeTruthy();
+    });
+    expect(
+      screen.getByText('Please enter a valid price greater than 0 for all items.')
+    ).toBeTruthy();
+
+    // Fetch should not have been called for POST
+    expect(global.fetch).toHaveBeenCalledTimes(1); // Only initial GET
+  });
+
+  it('rejects submission if an item price is empty', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockRequisition,
+    });
+
+    render(<VendorPublicForm />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('price-input-item-1')).toBeTruthy();
+    });
+
+    // Clear item 1 price
+    fireEvent.changeText(screen.getByTestId('price-input-item-1'), '');
+
+    // Attempt submission
+    const submitBtn = screen.getByTestId('confirm-submit-prices-btn');
+    fireEvent.press(submitBtn);
+
+    // Validation error banner should appear
+    await waitFor(() => {
+      expect(screen.getByTestId('vendor-submit-error')).toBeTruthy();
+    });
+    expect(
+      screen.getByText('Please enter a valid price greater than 0 for all items.')
+    ).toBeTruthy();
+
+    // Fetch should not have been called for POST
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
 });

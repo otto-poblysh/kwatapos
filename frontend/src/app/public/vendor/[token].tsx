@@ -79,6 +79,9 @@ export default function VendorPublicForm({
   }, [fetchRequisition]);
 
   const handlePriceChange = (itemId: string, text: string) => {
+    if (submitError) {
+      setSubmitError(null);
+    }
     setPrices((prev) => ({
       ...prev,
       [itemId]: text,
@@ -96,14 +99,25 @@ export default function VendorPublicForm({
   const handleSubmit = async () => {
     if (!token || !requisition) return;
 
+    // Validate that all items have a valid confirmed price > 0
+    const items = requisition.items || [];
+    for (const item of items) {
+      const valStr = prices[item.id];
+      const parsed = parseFloat(valStr ?? '');
+      if (valStr === undefined || valStr.trim() === '' || isNaN(parsed) || parsed <= 0) {
+        setSubmitError('Please enter a valid price greater than 0 for all items.');
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     setSubmitError(null);
 
     try {
       const payload = {
-        items: requisition.items.map((item) => ({
+        items: items.map((item) => ({
           item_id: item.id,
-          confirmed_price: parseFloat(prices[item.id] || '0') || 0,
+          confirmed_price: parseFloat(prices[item.id]),
         })),
       };
 
