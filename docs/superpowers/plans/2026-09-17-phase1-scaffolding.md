@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Establish the technical environments, folder structures, database container, and communication between a basic Rust backend and Expo frontend.
+**Goal:** Establish the technical environments, folder structures, database container, and communication between a basic Rust backend and Expo frontend using Test-Driven Development (TDD).
 
 **Architecture:** We are laying down the foundational Feature-First DDD structure for both the Rust Axum backend and React Native Expo frontend. This includes Docker setup for PostgreSQL and configuring specific ports to avoid conflicts (Backend: 8095, Frontend: 3010, 3011, 3012).
 
@@ -17,17 +17,6 @@
 
 ---
 
-## Required Simulator & Debugging Skills
-
-To easily access, control, and debug simulators to ensure everything is wired up properly during development, the following agent skills should be utilized:
-- `argent-ios-simulator-setup`: To boot and manage the iOS Simulator.
-- `argent-android-emulator-setup` (and `android-cli`): To boot and manage the Android Emulator via Colima/AVD.
-- `argent-device-interact`: To click, swipe, and navigate through the Expo app on simulators.
-- `argent-metro-debugger`: To interact with the Metro bundler logs.
-- `argent-screenshot-diff`: To compare the rendered UI against our expectations in `DESIGN.md`.
-
----
-
 ### Task 1: Docker & Database Setup
 
 **Files:**
@@ -37,6 +26,8 @@ To easily access, control, and debug simulators to ensure everything is wired up
 - Produces: A running Postgres instance on port `5432` with credentials `kwata_admin` / `kwata_password`.
 
 - [ ] **Step 1: Write `docker-compose.yml`**
+
+Create `docker-compose.yml` at the root of the project with the following:
 
 ```yaml
 version: '3.8'
@@ -59,67 +50,97 @@ volumes:
 
 - [ ] **Step 2: Start the database**
 
+Run the following commands in your terminal:
 ```bash
-# Ensure colima is running first
 colima start
 docker-compose up -d
 ```
 
 - [ ] **Step 3: Verify the database is running**
 
+Run:
 ```bash
 docker ps | grep kwatapos_db
 ```
-Expected: Output showing `kwatapos_db` running and listening on `0.0.0.0:5432`.
+*Expected: You should see `kwatapos_db` running and listening on `0.0.0.0:5432`.*
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git init
 git add docker-compose.yml
 git commit -m "chore: setup postgres database via docker"
 ```
 
 ---
 
-### Task 2: Scaffold Backend (Rust Axum)
+### Task 2: Scaffold Backend (Rust Axum) with TDD
+
+We will build the health check endpoint using a strictly RED-GREEN-REFACTOR TDD loop.
 
 **Files:**
 - Create: `backend/Cargo.toml`
 - Create: `backend/src/main.rs`
+- Create: `backend/tests/health_check_test.rs`
 
-**Interfaces:**
-- Consumes: Database (though not wired yet, ports reserved).
-- Produces: API running on `http://127.0.0.1:8095/api/health`.
-
-- [ ] **Step 1: Initialize Rust project**
+- [ ] **Step 1: Initialize Rust project and dependencies**
 
 ```bash
 cargo new backend
-```
-
-- [ ] **Step 2: Add dependencies**
-
-```bash
 cd backend
 cargo add axum@0.8.9 tokio@1.53.1 --features tokio/full
 cargo add serde@1.0 serde_json@1.0
+cargo add --dev reqwest --features json
+cargo add --dev tower --features util
+cargo add --dev http-body-util
 ```
 
-- [ ] **Step 3: Write minimal implementation in `backend/src/main.rs`**
+- [ ] **Step 2: RED - Write the failing test**
 
+Create the `backend/tests/health_check_test.rs` file. This test will simulate an HTTP request to our router before the router even exists.
+
+```rust
+use axum::{body::Body, http::{Request, StatusCode}};
+use tower::ServiceExt;
+use serde_json::Value;
+
+// We will test the router directly without spinning up a TCP listener
+#[tokio::test]
+async fn test_health_check_returns_200_and_json() {
+    let app = backend::app(); // 'app' function doesn't exist yet!
+
+    let response = app
+        .oneshot(Request::builder().uri("/api/health").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = http_body_util::BodyExt::collect(response.into_body()).await.unwrap().to_bytes();
+    let json: Value = serde_json::from_slice(&body).unwrap();
+    
+    assert_eq!(json["status"], "ok");
+    assert_eq!(json["message"], "System Online");
+}
+```
+
+- [ ] **Step 3: Run the test (Verify it fails)**
+
+```bash
+cargo test
+```
+*Expected: Compilation failure because `backend::app()` is not defined.*
+
+- [ ] **Step 4: GREEN - Write the minimal implementation**
+
+Modify `backend/src/main.rs` to make the test pass. We will export the `app()` function so the test can use it. Update `backend/src/lib.rs` to expose the app if needed, or define it directly in `main.rs`. Let's create `backend/src/lib.rs` for testability:
+
+Create `backend/src/lib.rs`:
 ```rust
 use axum::{routing::get, Router, response::Json};
 use serde_json::{Value, json};
 
-#[tokio::main]
-async fn main() {
-    let app = Router::new()
-        .route("/api/health", get(health_check));
-
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8095").await.unwrap();
-    println!("Backend server listening on 8095");
-    axum::serve(listener, app).await.unwrap();
+pub fn app() -> Router {
+    Router::new().route("/api/health", get(health_check))
 }
 
 async fn health_check() -> Json<Value> {
@@ -127,94 +148,112 @@ async fn health_check() -> Json<Value> {
 }
 ```
 
-- [ ] **Step 4: Run server & test endpoint**
+Update `backend/src/main.rs`:
+```rust
+use backend::app;
 
-Run server in background (or separate terminal):
-```bash
-cargo run &
+#[tokio::main]
+async fn main() {
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:8095").await.unwrap();
+    println!("Backend server listening on 8095");
+    axum::serve(listener, app()).await.unwrap();
+}
 ```
-Test:
-```bash
-curl http://127.0.0.1:8095/api/health
-```
-Expected: `{"message":"System Online","status":"ok"}`.
-*(Kill background process after test).*
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Run the test (Verify it passes)**
+
+```bash
+cargo test
+```
+*Expected: PASS.*
+
+- [ ] **Step 6: Commit**
 
 ```bash
 cd ..
 git add backend/
-git commit -m "feat: setup rust axum backend on port 8095"
+git commit -m "feat: setup rust axum backend with TDD health check on port 8095"
 ```
 
 ---
 
-### Task 3: Scaffold Frontend (React Native Expo)
+### Task 3: Scaffold Frontend (React Native Expo) with TDD
 
 **Files:**
 - Create: `frontend/package.json`
 - Create: `frontend/app.json`
 - Create: `frontend/src/app/index.tsx`
-- Create: `frontend/src/app/_layout.tsx`
-
-**Interfaces:**
-- Consumes: API at `http://127.0.0.1:8095/api/health`.
-- Produces: Expo app running locally.
+- Create: `frontend/src/app/index.test.tsx`
 
 - [ ] **Step 1: Initialize Expo project**
 
 ```bash
 npx create-expo-app@latest frontend --template blank
+cd frontend
 ```
 
-- [ ] **Step 2: Configure Ports & Dependencies**
+- [ ] **Step 2: Configure Ports & Install Router/Jest**
 
-Modify `frontend/package.json` scripts to enforce ports:
+Update `frontend/package.json` scripts:
 ```json
   "scripts": {
     "start": "expo start --port 3010",
     "android": "expo start --android --port 3012",
     "ios": "expo start --ios --port 3011",
-    "web": "expo start --web --port 3010"
+    "web": "expo start --web --port 3010",
+    "test": "jest"
   }
 ```
-Install Expo Router:
+
+Install Dependencies:
 ```bash
-cd frontend
 npx expo install expo-router react-native-safe-area-context react-native-screens expo-linking expo-constants expo-status-bar
+npm install --save-dev jest jest-expo @testing-library/react-native @types/jest
 ```
 
-- [ ] **Step 3: Setup routing entrypoints**
-
-Update `frontend/package.json` main entry:
-```json
-  "main": "expo-router/entry"
+Setup `frontend/jest.config.js`:
+```javascript
+module.exports = {
+  preset: 'jest-expo',
+  setupFilesAfterEnv: ['@testing-library/react-native/extend-expect'],
+};
 ```
 
-Update `frontend/app.json` to configure router:
+Update `frontend/app.json`:
 ```json
 {
   "expo": {
     "scheme": "kwatapos",
-    "plugins": [
-      "expo-router"
-    ],
-    "experiments": {
-      "typedRoutes": true
-    }
+    "plugins": ["expo-router"],
+    "experiments": { "typedRoutes": true }
   }
 }
 ```
 
-Create `frontend/src/app/_layout.tsx`:
-```tsx
-import { Stack } from 'expo-router';
+- [ ] **Step 3: RED - Write the failing test**
 
-export default function Layout() {
-  return <Stack />;
-}
+Create `frontend/src/app/index.test.tsx`:
+```tsx
+import React from 'react';
+import { render, screen } from '@testing-library/react-native';
+import Home from './index';
+
+describe('Home Screen', () => {
+  it('displays the loading state initially', () => {
+    render(<Home />);
+    expect(screen.getByText('Loading...')).toBeTruthy();
+  });
+});
 ```
+
+- [ ] **Step 4: Run the test (Verify it fails)**
+
+```bash
+npm run test
+```
+*Expected: Fail because `index.tsx` does not exist.*
+
+- [ ] **Step 5: GREEN - Write the minimal implementation**
 
 Create `frontend/src/app/index.tsx`:
 ```tsx
@@ -224,6 +263,7 @@ import { View, Text, StyleSheet } from 'react-native';
 export default function Home() {
   const [status, setStatus] = useState('Loading...');
 
+  // Minimal implementation to pass the test and fetch data
   useEffect(() => {
     fetch('http://127.0.0.1:8095/api/health')
       .then(res => res.json())
@@ -233,37 +273,27 @@ export default function Home() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.text}>{status}</Text>
+      <Text>{status}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F2F2F7',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  text: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#000000',
-  }
+  container: { flex: 1, backgroundColor: '#F2F2F7', alignItems: 'center', justifyContent: 'center' },
 });
 ```
 
-- [ ] **Step 4: Verify Web App**
+- [ ] **Step 6: Run the test (Verify it passes)**
 
 ```bash
-npm run web
+npm run test
 ```
-*(Ensure it boots on port 3010 and displays "Backend Offline" or "System Online" if backend is running).*
+*Expected: PASS.*
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 cd ..
 git add frontend/
-git commit -m "feat: setup expo router frontend checking backend health"
+git commit -m "feat: setup expo frontend with jest TDD checking backend health"
 ```
