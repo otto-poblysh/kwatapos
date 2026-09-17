@@ -1,0 +1,37 @@
+{
+  "name": "frontend",
+  "version": "1.0.0",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start --port 3010",
+    "android": "expo start --android --port 3012",
+    "ios": "expo start --ios --port 3011",
+    "web": "expo start --web --port 3010",
+    "test": "jest",
+    "postinstall": "node -e \"const fs = require('fs'); const p = 'node_modules/@testing-library/react-native/extend-expect.js'; if (fs.existsSync('node_modules/@testing-library/react-native') && !fs.existsSync(p)) fs.writeFileSync(p, 'module.exports = require(\\'./build/matchers/extend-expect\\');\\n');\""
+  },
+  "dependencies": {
+    "expo": "~57.0.23",
+    "expo-constants": "~57.0.18",
+    "expo-linking": "~57.0.10",
+    "expo-router": "~57.0.21",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-web": "^0.21.2"
+  },
+  "devDependencies": {
+    "@react-native/jest-preset": "^0.86.3",
+    "@testing-library/react-native": "^13.3.3",
+    "@types/jest": "^29.5.14",
+    "@types/react": "^19.0.10",
+    "jest": "~29.7.0",
+    "jest-expo": "~57.0.5",
+    "react-test-renderer": "^19.2.3",
+    "typescript": "^5.8.2"
+  },
+  "private": true
+}
