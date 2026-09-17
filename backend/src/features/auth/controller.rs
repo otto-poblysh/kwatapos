@@ -61,11 +61,14 @@ pub async fn login_handler(
             Json(json!({"error": "Invalid email or password"})),
         )
             .into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": e.to_string()})),
-        )
-            .into_response(),
+        Err(e) => {
+            eprintln!("Internal auth error during login: {e}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Internal server error"})),
+            )
+                .into_response()
+        }
     }
 }
 
@@ -74,11 +77,14 @@ pub async fn refresh_handler(Json(payload): Json<RefreshRequest>) -> Response {
         Ok(access_token) => {
             (StatusCode::OK, Json(RefreshResponse { access_token })).into_response()
         }
-        Err(_) => (
-            StatusCode::UNAUTHORIZED,
-            Json(json!({"error": "Invalid or expired refresh token"})),
-        )
-            .into_response(),
+        Err(e) => {
+            eprintln!("Refresh token error: {e}");
+            (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error": "Invalid or expired refresh token"})),
+            )
+                .into_response()
+        }
     }
 }
 
@@ -137,11 +143,14 @@ pub async fn me_handler(
                 Json(json!({"error": "User no longer exists"})),
             )
                 .into_response(),
-            Err(e) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": format!("Database error: {}", e)})),
-            )
-                .into_response(),
+            Err(e) => {
+                eprintln!("Internal database error during me_handler: {e}");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({"error": "Internal server error"})),
+                )
+                    .into_response()
+            }
         }
     } else {
         (

@@ -100,12 +100,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const storedUser = await authStorage.getItem(USER_KEY);
 
         if (storedToken && storedUser) {
+          const parsedUser = JSON.parse(storedUser);
           setAccessToken(storedToken);
           setRefreshToken(storedRefresh);
-          setUser(JSON.parse(storedUser));
+          setUser(parsedUser);
         }
       } catch (err) {
         console.warn('Failed to restore session:', err);
+        setAccessToken(null);
+        setRefreshToken(null);
+        setUser(null);
+        await Promise.all([
+          authStorage.removeItem(ACCESS_TOKEN_KEY),
+          authStorage.removeItem(REFRESH_TOKEN_KEY),
+          authStorage.removeItem(USER_KEY),
+        ]);
       } finally {
         setIsLoading(false);
       }
@@ -156,17 +165,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRefreshToken(null);
     setUser(null);
   };
-
-  if (typeof __DEV__ !== 'undefined' && __DEV__) {
-    (globalThis as any).__auth = {
-      login,
-      logout,
-      user,
-      accessToken,
-      refreshToken,
-      isLoading,
-    };
-  }
 
   return (
     <AuthContext.Provider

@@ -29,11 +29,17 @@ function NavigationGuard() {
       } else if (segments[0] === '(admin)' && user.role !== 'admin') {
         if (user.role === 'manager') {
           router.replace('/(manager)');
-        } else {
+        } else if (user.role === 'sales') {
           router.replace('/(sales)');
+        } else {
+          router.replace('/(auth)/login');
         }
-      } else if (segments[0] === '(manager)' && user.role === 'sales') {
-        router.replace('/(sales)');
+      } else if (segments[0] === '(manager)' && user.role !== 'manager' && user.role !== 'admin') {
+        if (user.role === 'sales') {
+          router.replace('/(sales)');
+        } else {
+          router.replace('/(auth)/login');
+        }
       }
     }
   }, [user, isLoading, segments, router]);

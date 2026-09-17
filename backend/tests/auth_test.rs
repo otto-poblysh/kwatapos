@@ -32,6 +32,13 @@ async fn test_hash_generation() {
     assert!(backend::features::auth::service::verify_password("admin123", &admin_hash));
     assert!(backend::features::auth::service::verify_password("manager123", &manager_hash));
     assert!(backend::features::auth::service::verify_password("sales123", &sales_hash));
+
+    // Dynamic salt generates different hashes for the same password
+    let hash1 = backend::features::auth::service::hash_password("same_password").unwrap();
+    let hash2 = backend::features::auth::service::hash_password("same_password").unwrap();
+    assert_ne!(hash1, hash2);
+    assert!(backend::features::auth::service::verify_password("same_password", &hash1));
+    assert!(backend::features::auth::service::verify_password("same_password", &hash2));
 }
 
 #[tokio::test]

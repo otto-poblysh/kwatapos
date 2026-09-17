@@ -63,6 +63,24 @@ describe('useAuth Hook', () => {
     expect(result.current.accessToken).toBe('saved_access_token');
   });
 
+  it('clears storage when stored session is corrupted', async () => {
+    await authStorage.setItem(ACCESS_TOKEN_KEY, 'corrupted_token');
+    await authStorage.setItem('kwatapos_refresh_token', 'corrupted_refresh');
+    await authStorage.setItem('kwatapos_user', 'invalid-json-{');
+
+    const { result } = renderHook(() => useAuth(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.user).toBeNull();
+    expect(result.current.accessToken).toBeNull();
+    expect(await authStorage.getItem(ACCESS_TOKEN_KEY)).toBeNull();
+    expect(await authStorage.getItem('kwatapos_refresh_token')).toBeNull();
+    expect(await authStorage.getItem('kwatapos_user')).toBeNull();
+  });
+
   it('logs in successfully and saves session', async () => {
     const mockUser = { id: 'u1', email: 'admin@kwatapos.com', role: 'admin' };
     global.fetch = jest.fn().mockResolvedValue({
