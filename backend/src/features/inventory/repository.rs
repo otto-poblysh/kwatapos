@@ -73,10 +73,16 @@ pub async fn decrement_inventory(
     product_id: Uuid,
     quantity: i32,
 ) -> Result<Inventory, sqlx::Error> {
+    if quantity <= 0 {
+        return Err(sqlx::Error::Protocol(
+            "decrement quantity must be positive".into(),
+        ));
+    }
+
     sqlx::query_as::<_, Inventory>(
         "UPDATE inventory \
          SET quantity = quantity - $1, updated_at = NOW() \
-         WHERE product_id = $2 \
+         WHERE product_id = $2 AND quantity >= $1 \
          RETURNING product_id, quantity, updated_at",
     )
     .bind(quantity)
@@ -90,10 +96,16 @@ pub async fn decrement_inventory_tx<'a>(
     product_id: Uuid,
     quantity: i32,
 ) -> Result<Inventory, sqlx::Error> {
+    if quantity <= 0 {
+        return Err(sqlx::Error::Protocol(
+            "decrement quantity must be positive".into(),
+        ));
+    }
+
     sqlx::query_as::<_, Inventory>(
         "UPDATE inventory \
          SET quantity = quantity - $1, updated_at = NOW() \
-         WHERE product_id = $2 \
+         WHERE product_id = $2 AND quantity >= $1 \
          RETURNING product_id, quantity, updated_at",
     )
     .bind(quantity)

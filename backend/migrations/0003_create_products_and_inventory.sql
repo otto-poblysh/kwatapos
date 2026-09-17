@@ -7,9 +7,9 @@ CREATE TABLE IF NOT EXISTS products (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Create inventory table
+-- Create inventory table with check constraint to prevent negative stock
 CREATE TABLE IF NOT EXISTS inventory (
     product_id UUID PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE,
-    quantity INT NOT NULL DEFAULT 0,
+    quantity INT NOT NULL DEFAULT 0 CHECK (quantity >= 0),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

@@ -174,3 +174,83 @@ async fn test_inventory_decrement_and_transactions() {
         "Inventory should be cascade-deleted when product is deleted"
     );
 }
+
+#[tokio::test]
+async fn test_inventory_decrement_underflow_and_validation() {
+    let db_url = backend::database_url();
+
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&db_url)
+        .await
+        .expect("Failed to connect to database");
+
+    backend::run_migrations(&pool)
+        .await
+        .expect("Failed to run migrations");
+
+    let test_product = create_product(&pool, "Underflow Test Product", 300.0, "test")
+        .await
+        .expect("Failed to create test product");
+
+    set_inventory(&pool, test_product.id, 10)
+        .await
+        .expect("Failed to set initial inventory to 10");
+
+    // 1. Decrementing by more than available stock should fail with RowNotFound
+    let underflow_result = decrement_inventory(&pool, test_product.id, 15).await;
+    match underflow_result {
+        Err(sqlx::Error::RowNotFound) => {} // Expected: WHERE quantity >= $1 failed
+        other => panic!("Expected RowNotFound for underflow, got: {other:?}"),
+    }
+
+    // Inventory must remain unchanged at 10
+    let inv_after_underflow = get_inventory(&pool, test_product.id)
+        .await
+        .expect("Failed to get inventory")
+        .expect("Inventory should exist");
+    assert_eq!(
+        inv_after_underflow.quantity, 10,
+        "Inventory quantity should remain unchanged after underflow attempt"
+    );
+
+    // 2. Decrementing by zero should fail validation
+    let zero_result = decrement_inventory(&pool, test_product.id, 0).await;
+    assert!(
+        zero_result.is_err(),
+        "Expected error when decrementing by zero"
+    );
+
+    // 3. Decrementing by negative amount should fail validation
+    let neg_result = decrement_inventory(&pool, test_product.id, -5).await;
+    assert!(
+        neg_result.is_err(),
+        "Expected error when decrementing by negative amount"
+    );
+
+    // 4. In-transaction underflow should also fail with RowNotFound
+    let mut tx = pool.begin().await.expect("Failed to begin tx");
+    let tx_underflow_result = decrement_inventory_tx(&mut tx, test_product.id, 20).await;
+    match tx_underflow_result {
+        Err(sqlx::Error::RowNotFound) => {}
+        other => panic!("Expected RowNotFound for tx underflow, got: {other:?}"),
+    }
+    tx.rollback().await.expect("Failed to rollback tx");
+
+    // Inventory must remain unchanged at 10
+    let final_inv = get_inventory(&pool, test_product.id)
+        .await
+        .expect("Failed to get inventory")
+        .expect("Inventory should exist");
+    assert_eq!(
+        final_inv.quantity, 10,
+        "Inventory quantity should remain 10 after all rejected attempts"
+    );
+
+    // Cleanup
+    sqlx::query("DELETE FROM products WHERE id = $1")
+        .bind(test_product.id)
+        .execute(&pool)
+        .await
+        .expect("Failed to delete test product");
+}
