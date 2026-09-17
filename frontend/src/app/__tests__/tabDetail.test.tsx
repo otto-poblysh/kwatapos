@@ -193,7 +193,10 @@ describe('TabDetailScreen', () => {
       );
       // Clears active order and navigates to /(sales)
       expect(useCartStore.getState().activeOrderId).toBeNull();
-      expect(mockPush).toHaveBeenCalledWith('/(sales)');
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(sales)',
+        params: { settledTab: 'Table 4' },
+      });
     });
   });
 

@@ -15,6 +15,7 @@ jest.mock('expo-router', () => ({
     push: mockPush,
     replace: mockReplace,
   }),
+  useLocalSearchParams: () => ({}),
 }));
 
 const mockOrders = [

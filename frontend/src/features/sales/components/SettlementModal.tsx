@@ -183,7 +183,7 @@ export function SettlementModal({
         payment_method: selectedMethod,
       };
 
-      if (selectedCustomer?.id) {
+      if (selectedMethod === 'credit' && selectedCustomer?.id) {
         payload.customer_id = selectedCustomer.id;
       }
 
@@ -311,6 +311,9 @@ export function SettlementModal({
                           <View style={styles.customerCardInfo}>
                             <Text style={styles.customerCardName}>
                               Customer: {selectedCustomer.name} ({selectedCustomer.phone_number})
+                            </Text>
+                            <Text style={styles.customerCardId} testID="customer-card-id">
+                              ID: {selectedCustomer.id}
                             </Text>
                           </View>
                           <TouchableOpacity
@@ -613,6 +616,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#111111',
+  },
+  customerCardId: {
+    fontSize: 11,
+    color: '#8E8E93',
+    marginTop: 2,
   },
   changeCustomerButton: {
     paddingHorizontal: 12,

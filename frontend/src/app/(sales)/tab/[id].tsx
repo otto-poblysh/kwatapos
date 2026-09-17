@@ -112,11 +112,15 @@ export default function TabDetailScreen() {
 
   const handleSettlementSuccess = useCallback(
     (_settledOrder: any) => {
+      const tabName = order?.order_name || 'Tab';
       clearActiveOrder();
       setIsSettlementModalVisible(false);
-      router.push('/(sales)');
+      router.push({
+        pathname: '/(sales)',
+        params: { settledTab: tabName },
+      });
     },
-    [clearActiveOrder, router]
+    [clearActiveOrder, order?.order_name, router]
   );
 
   const isWide = width >= 768;

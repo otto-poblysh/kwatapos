@@ -12,7 +12,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../core/hooks/useAuth';
 import { getApiBaseUrl } from '../../core/context/AuthContext';
 
@@ -30,12 +30,14 @@ export interface OpenOrder {
 export default function SalesDashboard() {
   const { user, logout } = useAuth();
   const router = useRouter();
+  const { settledTab } = useLocalSearchParams<{ settledTab?: string }>();
   const { width } = useWindowDimensions();
 
   const [orders, setOrders] = useState<OpenOrder[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [settledNotice, setSettledNotice] = useState<string | null>(null);
 
   const [isNewTabModalVisible, setIsNewTabModalVisible] = useState<boolean>(false);
   const [newTabName, setNewTabName] = useState<string>('');
@@ -70,6 +72,12 @@ export default function SalesDashboard() {
   useEffect(() => {
     fetchOpenOrders();
   }, [fetchOpenOrders]);
+
+  useEffect(() => {
+    if (settledTab) {
+      setSettledNotice(`Tab "${settledTab}" settled successfully!`);
+    }
+  }, [settledTab]);
 
   const handleOpenNewTabModal = () => {
     setNewTabName('');
@@ -177,6 +185,20 @@ export default function SalesDashboard() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Settlement Success Banner */}
+      {settledNotice && (
+        <View style={styles.settlementBanner} testID="settlement-success-banner">
+          <Text style={styles.settlementBannerText}>{settledNotice}</Text>
+          <TouchableOpacity
+            onPress={() => setSettledNotice(null)}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss notice"
+          >
+            <Text style={styles.dismissNoticeText}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Main Content */}
       {isLoading ? (
@@ -712,6 +734,29 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     backgroundColor: '#E5E5EA',
+  },
+  settlementBanner: {
+    backgroundColor: '#34C759',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginTop: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  settlementBannerText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    flex: 1,
+  },
+  dismissNoticeText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    paddingLeft: 12,
   },
 });
 
