@@ -55,6 +55,7 @@ describe('Dashboard Screens', () => {
       expect(screen.getByText('Manager Dashboard')).toBeTruthy();
       expect(screen.getByText('manager@kwatapos.com')).toBeTruthy();
       expect(screen.getByText('manager')).toBeTruthy();
+      expect(screen.getByRole('button', { name: /manage requisitions/i })).toBeTruthy();
 
       const logoutBtn = screen.getByRole('button', { name: /log out/i });
       fireEvent.press(logoutBtn);

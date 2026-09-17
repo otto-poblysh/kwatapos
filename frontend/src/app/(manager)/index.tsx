@@ -1,10 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useAuth } from '../../core/hooks/useAuth';
 
 export default function ManagerDashboard() {
   const { user, logout } = useAuth();
+  const router = useRouter();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -24,6 +26,16 @@ export default function ManagerDashboard() {
               <Text style={styles.roleText}>{user?.role ?? 'manager'}</Text>
             </View>
           </View>
+
+          <TouchableOpacity
+            style={styles.manageButton}
+            onPress={() => router.push('/(manager)/requisitions')}
+            accessibilityRole="button"
+            accessibilityLabel="Manage Requisitions"
+            testID="manage-requisitions-btn"
+          >
+            <Text style={styles.manageButtonText}>Manage Requisitions</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.logoutButton}
@@ -102,7 +114,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
   },
-  logoutButton: {
+  manageButton: {
     backgroundColor: '#000000',
     borderRadius: 9999,
     paddingVertical: 16,
@@ -110,9 +122,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 24,
   },
-  logoutText: {
+  manageButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
+    fontWeight: '700',
+  },
+  logoutButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    borderRadius: 9999,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  logoutText: {
+    color: '#111111',
+    fontSize: 15,
     fontWeight: '700',
   },
 });
