@@ -42,15 +42,16 @@ To ensure steady progress and allow for regular team reviews, the development of
 
 ---
 
-## Phase 4: The Credit System
-**Goal:** Implement the critical business requirement of tracking unpaid tabs.
+## Phase 4: Open Orders & Flexible Checkout (Tabs & Credit)
+**Goal:** Align the POS with real-world bar operations by allowing staff to keep orders open over time and settle them with various payment methods.
 **Tasks:**
-- Create `customers` and `credits` database tables.
-- Build the "Mark as Credit" checkout flow in the POS.
-- Implement the flow to search for existing customers by phone number or quickly add a new customer during checkout.
-- Build a view for Sales Staff to see outstanding tabs.
+- Modify the `orders` database schema to include `status` (Open, Closed), `order_name` (e.g., Table 4), and `payment_method` (Cash, Card, Transfer, Credit).
+- Build backend APIs to Create an Open Order, Append items to it, and Settle it.
+- Create the `customers` and `credits` database tables to support the Credit payment method.
+- Redesign the Sales Frontend: The primary view becomes a grid of "Open Orders".
+- Build the Flexible Settlement Modal: When settling, staff can choose Card, Transfer, Cash, or Credit (which triggers the customer phone number capture).
 **Deliverable (Demo):** 
-> A Sales Staff member processes a large order and selects "Credit". They quickly add a new customer's name and phone number. The order is finalized without cash, and the customer's outstanding balance is displayed.
+> A Sales Staff member creates an order for "Table 4". Over an hour, they append three rounds of drinks to it. Finally, they open the order, hit "Settle", and select "Bank Transfer". The order is closed and inventory is properly decremented.
 
 ---
 
