@@ -59,10 +59,20 @@ Kwata POS is a modern Point of Sale (POS) application designed specifically for 
 - **Dimensions**:
   - *Functional*: Support multi-modal checkouts and strict phone-number capture for credit.
 
-### 3.3. Job: Restocking Inventory
-- **Situation**: When stock levels drop...
-- **Motivation**: I want to quickly request a restock from the owner...
-- **Expected Outcome**: So the business can continue operating.
+### 3.3. Job: Managing Vendor Requisitions
+- **Situation**: When stock levels drop and a large order is needed from a supplier...
+- **Motivation**: I want to quickly generate a list of needed items, share it with the vendor via WhatsApp, and let them confirm or update the prices...
+- **Expected Outcome**: So we have a documented agreement before delivery, and the delivery can be easily reconciled against the order.
+- **Dimensions**:
+  - *Functional*: Create requisition -> Share via Native UI (PDF/HTML Link) -> Vendor updates prices -> Accept Order -> Receive Items (partial or full) -> Mark as Paid.
+  - *Social*: Professional, seamless communication with external vendors.
+
+### 3.4. Job: Handling Direct Shop Expenses
+- **Situation**: When the shop needs immediate supplies (cigarettes, fish, soap, serviettes) that don't come through formal vendors...
+- **Motivation**: I want to request the cash from the owner, receive it, and log the receipt...
+- **Expected Outcome**: So the cash drawer remains balanced and accountability is maintained.
+- **Dimensions**:
+  - *Functional*: Request Expense -> Owner Approves/Sends Money -> Mark Cash Received -> Upload Receipt.
 
 ---
 
@@ -76,5 +86,22 @@ Kwata POS is a modern Point of Sale (POS) application designed specifically for 
 | **User Goals** | Start a new order for a seated group. | Add new drinks as requested quickly. | Calculate final total. | Process the final payment method. |
 | **Actions** | Taps "New Order", enters "Table 4". | Opens "Table 4" from dashboard, adds items, hits "Save". | Opens "Table 4", reviews items. | Selects "Checkout", chooses "Bank Transfer" or "Credit". |
 | **Touchpoints** | POS Dashboard (Open Orders View) | POS Order Detail / Menu | POS Checkout View | POS Payment Modal |
-| **Pain Points** | - | Finding the specific open order among many. | - | Network issues for transfers; capturing phone numbers for credit. |
-| **Opportunities** | Auto-assign order numbers if table isn't provided. | Sort open orders by "last updated". | - | Clear buttons for [Card] [Transfer] [Cash] [Credit]. |
+### 4.2. The "Vendor Requisition" Journey (Store Manager & Vendor)
+**Scenario**: Manager needs to restock drinks from the main supplier.
+
+| Stage | 1. Draft Request | 2. Share via WhatsApp | 3. Vendor Confirmation | 4. Delivery & Payment |
+|---|---|---|---|---|
+| **User Goals** | List needed items. | Send list to the vendor. | Vendor confirms/adjusts pricing. | Verify goods received and pay. |
+| **Actions** | Selects items, hits "Share". | Uses native iOS/Android sharing to WhatsApp. | Vendor opens HTML link, edits prices, submits. | Manager marks partial/full delivery. Later marks Paid. |
+| **Touchpoints** | POS App (Requisitions) | Native OS Share Sheet | Web Browser (External Link) | POS App (Requisitions) |
+| **Pain Points** | Remembering last purchase price. | Transcribing orders to chat. | - | Vendor delivering less than ordered. |
+| **Opportunities** | Show last purchase price automatically. | 1-tap PDF/Link generation. | Frictionless mobile-friendly vendor form. | Easy UI to adjust received quantities. |
+
+### 4.3. The "Direct Shop Expense" Journey (Shop Keeper & Manager)
+**Scenario**: Running out of soap and serviettes during a shift.
+
+| Stage | 1. Request Cash | 2. Owner Approval | 3. Purchase | 4. Receipt Upload |
+|---|---|---|---|---|
+| **User Goals** | Ask for permission/funds. | Send money to staff. | Buy the items. | Prove accountability. |
+| **Actions** | Enters amount and reason in app. | Reviews and sends mobile money. | Marks "Cash Received" in app. | Takes photo of vendor receipt, uploads to app. |
+| **Opportunities** | Preset categories (Supplies, Fish, Cigarettes). | Push notification for instant approval. | - | Mandatory receipt upload for the transaction to close. |

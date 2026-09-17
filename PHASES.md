@@ -55,15 +55,17 @@ To ensure steady progress and allow for regular team reviews, the development of
 
 ---
 
-## Phase 5: Inventory Requisitions
-**Goal:** Empower Store Managers to restock without physical travel, and Super Admins to maintain control.
+## Phase 5: Inventory Requisitions, Vendor Collaboration & Direct Expenses
+**Goal:** Empower Managers to restock efficiently via native sharing, collaborate with external vendors, and process direct cash expenses transparently.
 **Tasks:**
-- Create `requisitions` database tables with status tracking (Pending, Approved, Received).
-- Build the Store Manager UI to view low stock and submit a restock request.
-- Build the Super Admin UI to review pending requisitions, compare against current stock, and approve them.
-- Build the Store Manager flow to mark an approved requisition as "Received" to officially update inventory.
+- Create `requisitions` and `direct_expenses` tables.
+- Build the Manager UI to draft requisitions showing the *last purchase price*.
+- Implement `expo-sharing` and `expo-print` to generate a PDF/Link and share it natively (e.g., to WhatsApp).
+- Build a lightweight external Web UI for the Vendor to confirm or adjust prices.
+- Implement the "Delivery & Payment" flow: Manager marks items as Received (adjusting quantities if necessary), and later marks the invoice as Paid.
+- Build the Direct Expense flow: Shop keeper requests cash, manager approves, shop keeper uploads the physical receipt via `expo-camera`/`expo-image-picker`.
 **Deliverable (Demo):** 
-> A Store Manager submits a request for 5 crates of beer. The Super Admin logs in, sees the notification, and clicks "Approve". The Store Manager later clicks "Received", and the beer inventory instantly increases by the requested amount.
+> A Manager drafts a requisition for Beer and taps "Share". WhatsApp opens. The vendor clicks the shared link, updates a price, and submits. The Manager sees the update, accepts it, and later logs that only 8 of 10 crates were actually delivered, finally marking the adjusted invoice as Paid. Meanwhile, a Shop Keeper requests 5,000 FCFA for soap, marks it received, and uploads a photo of the receipt.
 
 ---
 
