@@ -665,7 +665,59 @@ async fn test_api_public_vendor_flow() {
         .unwrap();
     assert_eq!(res_pub_404.status(), StatusCode::NOT_FOUND);
 
-    // 3. POST /api/public/requisition/:token updates confirmed prices and sets status to 'accepted'
+    // 3. POST /api/public/requisition/:token fails when status is 'draft'
+    let res_pub_post_draft = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/public/requisition/{}", token))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [{ "item_id": item_id, "confirmed_price": "700.00" }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_pub_post_draft.status(), StatusCode::BAD_REQUEST);
+
+    // Share requisition to transition to 'sent'
+    let req_id = created["id"].as_str().unwrap();
+    let res_share = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/share", req_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_share.status(), StatusCode::OK);
+
+    // 4. POST with duplicate item returns 400
+    let res_pub_dup = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/public/requisition/{}", token))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [
+                        { "item_id": item_id, "confirmed_price": "700.00" },
+                        { "item_id": item_id, "confirmed_price": "750.00" }
+                    ]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_pub_dup.status(), StatusCode::BAD_REQUEST);
+
+    // 5. POST /api/public/requisition/:token updates confirmed prices and sets status to 'accepted'
     let res_pub_post = app
         .clone()
         .oneshot(
@@ -686,7 +738,7 @@ async fn test_api_public_vendor_flow() {
     assert_eq!(pub_post_json["status"], "accepted");
     assert_eq!(pub_post_json["items"][0]["confirmed_price"], "700.00");
 
-    // 4. POST with invalid item returns 400
+    // 6. POST with invalid item returns 400
     let res_invalid_item = app
         .clone()
         .oneshot(
@@ -703,7 +755,7 @@ async fn test_api_public_vendor_flow() {
         .unwrap();
     assert_eq!(res_invalid_item.status(), StatusCode::BAD_REQUEST);
 
-    // 5. POST non-existent token returns 404
+    // 7. POST non-existent token returns 404
     let res_post_404 = app
         .clone()
         .oneshot(
@@ -789,6 +841,26 @@ async fn test_api_deliver_requisition_flow() {
         .await
         .unwrap();
 
+    // Delivery with duplicate item_id returns 400
+    let res_dup_deliver = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/deliver", req_id))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [
+                        { "item_id": item1_id, "received_quantity": 8 },
+                        { "item_id": item1_id, "received_quantity": 8 }
+                    ]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_dup_deliver.status(), StatusCode::BAD_REQUEST);
+
     // 2. Partial delivery: item1 received 8 (< 10), item2 received 5 (== 5)
     let res_partial = app
         .clone()
@@ -818,8 +890,27 @@ async fn test_api_deliver_requisition_flow() {
     let inv2 = backend::features::inventory::repository::get_inventory(&pool, p2.id).await.unwrap().unwrap();
     assert_eq!(inv2.quantity, 5);
 
+    // Delivery quantity cannot decrease from previous delivery (7 < 8)
+    let res_decrease = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/deliver", req_id))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [
+                        { "item_id": item1_id, "received_quantity": 7 }
+                    ]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_decrease.status(), StatusCode::BAD_REQUEST);
+
     // 3. Full delivery on remaining (or deliver when all >= quantity):
-    // Deliver 10 for item 1, 5 for item 2
+    // Deliver 10 for item 1, 5 for item 2 (cumulative: delta for item 1 = 10 - 8 = 2, delta for item 2 = 5 - 5 = 0)
     let res_full = app
         .clone()
         .oneshot(
@@ -842,9 +933,11 @@ async fn test_api_deliver_requisition_flow() {
     let full_json: Value = serde_json::from_slice(&full_body).unwrap();
     assert_eq!(full_json["status"], "delivered");
 
-    // Inventory incremented by 10 and 5
+    // Inventory incremented by delta (8 + 2 = 10, NOT 18!)
     let inv1_after = backend::features::inventory::repository::get_inventory(&pool, p1.id).await.unwrap().unwrap();
-    assert_eq!(inv1_after.quantity, 18);
+    assert_eq!(inv1_after.quantity, 10);
+    let inv2_after = backend::features::inventory::repository::get_inventory(&pool, p2.id).await.unwrap().unwrap();
+    assert_eq!(inv2_after.quantity, 5);
 
     // 4. Deliver on already 'delivered' requisition returns 400
     let res_already_deliv = app
@@ -864,6 +957,41 @@ async fn test_api_deliver_requisition_flow() {
         .await
         .unwrap();
     assert_eq!(res_already_deliv.status(), StatusCode::BAD_REQUEST);
+
+    // Rejecting vendor price confirmation on delivered requisition
+    let token = created["token"].as_str().unwrap();
+    let res_pub_post_deliv = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/public/requisition/{}", token))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [{ "item_id": item1_id, "confirmed_price": "100.00" }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_pub_post_deliv.status(), StatusCode::BAD_REQUEST);
+
+    // Re-sharing a delivered requisition preserves 'delivered' status without overwriting
+    let res_reshare = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/share", req_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_reshare.status(), StatusCode::OK);
+    let reshare_body = res_reshare.into_body().collect().await.unwrap().to_bytes();
+    let reshare_json: Value = serde_json::from_slice(&reshare_body).unwrap();
+    assert_eq!(reshare_json["status"], "delivered");
 
     // 5. Negative received_quantity returns 400
     // Create another sent requisition
@@ -951,7 +1079,68 @@ async fn test_api_pay_requisition() {
     let created: Value = serde_json::from_slice(&body).unwrap();
     let req_id = created["id"].as_str().unwrap();
 
-    // 1. Pay transitions status to 'paid'
+    let token = created["token"].as_str().unwrap();
+    let item_id = created["items"][0]["id"].as_str().unwrap();
+
+    // 1. Pay fails in 'draft' status
+    let res_pay_draft = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/pay", req_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_pay_draft.status(), StatusCode::BAD_REQUEST);
+
+    // Share to transition to 'sent'
+    let _ = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/share", req_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    // 2. Pay fails in 'sent' status
+    let res_pay_sent = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/pay", req_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_pay_sent.status(), StatusCode::BAD_REQUEST);
+
+    // Vendor confirms price to transition to 'accepted'
+    let res_accept = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/public/requisition/{}", token))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [{ "item_id": item_id, "confirmed_price": "150.00" }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_accept.status(), StatusCode::OK);
+
+    // 3. Pay succeeds in 'accepted' status and transitions status to 'paid'
     let res_pay = app
         .clone()
         .oneshot(
@@ -968,7 +1157,21 @@ async fn test_api_pay_requisition() {
     let pay_json: Value = serde_json::from_slice(&pay_body).unwrap();
     assert_eq!(pay_json["status"], "paid");
 
-    // 2. Pay non-existent returns 404
+    // 4. Pay on already 'paid' requisition returns 400
+    let res_pay_again = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/pay", req_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_pay_again.status(), StatusCode::BAD_REQUEST);
+
+    // 5. Pay non-existent returns 404
     let res_pay_404 = app
         .clone()
         .oneshot(
@@ -982,4 +1185,285 @@ async fn test_api_pay_requisition() {
         .unwrap();
     assert_eq!(res_pay_404.status(), StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn test_cumulative_delivery_and_status_regression_guards() {
+    let (app, pool) = test_app_and_pool().await;
+
+    let p = create_product(&pool, "Cumulative Test Product", Decimal::new(250, 2), "Beverages")
+        .await
+        .unwrap();
+
+    let res_create = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/requisitions")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "title": "Cumulative Test",
+                    "items": [{ "product_id": p.id, "quantity": 15, "expected_price": "250.00" }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = res_create.into_body().collect().await.unwrap().to_bytes();
+    let created: Value = serde_json::from_slice(&body).unwrap();
+    let req_id = created["id"].as_str().unwrap();
+    let token = created["token"].as_str().unwrap();
+    let item_id = created["items"][0]["id"].as_str().unwrap();
+
+    // 1. Share to transition to 'sent'
+    let res_share1 = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/share", req_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_share1.status(), StatusCode::OK);
+
+    // 2. Multi-stage delivery: Stage 1 delivers 5 of 15
+    let res_deliv1 = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/deliver", req_id))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [{ "item_id": item_id, "received_quantity": 5 }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_deliv1.status(), StatusCode::OK);
+    let inv1 = backend::features::inventory::repository::get_inventory(&pool, p.id).await.unwrap().unwrap();
+    assert_eq!(inv1.quantity, 5);
+
+    // 3. Multi-stage delivery: Stage 2 delivers 10 cumulative of 15 (delta = 10 - 5 = 5)
+    let res_deliv2 = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/deliver", req_id))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [{ "item_id": item_id, "received_quantity": 10 }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_deliv2.status(), StatusCode::OK);
+    let inv2 = backend::features::inventory::repository::get_inventory(&pool, p.id).await.unwrap().unwrap();
+    assert_eq!(inv2.quantity, 10, "Cumulative stock must be 10, not phantom 15");
+
+    // 4. Preventing delivery quantity decrease: attempting to deliver 8 (< 10) must be rejected
+    let res_decrease = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/deliver", req_id))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [{ "item_id": item_id, "received_quantity": 8 }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_decrease.status(), StatusCode::BAD_REQUEST);
+    let decr_body = res_decrease.into_body().collect().await.unwrap().to_bytes();
+    let decr_json: Value = serde_json::from_slice(&decr_body).unwrap();
+    assert!(decr_json["error"].as_str().unwrap().contains("cannot decrease"));
+
+    // 5. Rejecting duplicate items in delivery payload
+    let res_dup_deliv = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/deliver", req_id))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [
+                        { "item_id": item_id, "received_quantity": 12 },
+                        { "item_id": item_id, "received_quantity": 12 }
+                    ]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_dup_deliv.status(), StatusCode::BAD_REQUEST);
+    let dup_deliv_body = res_dup_deliv.into_body().collect().await.unwrap().to_bytes();
+    let dup_deliv_json: Value = serde_json::from_slice(&dup_deliv_body).unwrap();
+    assert!(dup_deliv_json["error"].as_str().unwrap().contains("Duplicate item_id"));
+
+    // 6. Multi-stage delivery: Stage 3 delivers 15 cumulative of 15 (delta = 15 - 10 = 5)
+    let res_deliv3 = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/deliver", req_id))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [{ "item_id": item_id, "received_quantity": 15 }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_deliv3.status(), StatusCode::OK);
+    let deliv3_body = res_deliv3.into_body().collect().await.unwrap().to_bytes();
+    let deliv3_json: Value = serde_json::from_slice(&deliv3_body).unwrap();
+    assert_eq!(deliv3_json["status"], "delivered");
+
+    let inv3 = backend::features::inventory::repository::get_inventory(&pool, p.id).await.unwrap().unwrap();
+    assert_eq!(inv3.quantity, 15, "Final stock must be exactly 15, not 5 + 10 + 15 = 30");
+
+    // 7. Re-sharing a delivered requisition preserves 'delivered' status without overwriting
+    let res_reshare_deliv = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/share", req_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_reshare_deliv.status(), StatusCode::OK);
+    let reshare_deliv_body = res_reshare_deliv.into_body().collect().await.unwrap().to_bytes();
+    let reshare_deliv_json: Value = serde_json::from_slice(&reshare_deliv_body).unwrap();
+    assert_eq!(reshare_deliv_json["status"], "delivered");
+
+    let req_db_deliv = backend::features::requisitions::repository::get_requisition_by_id(&pool, created["id"].as_str().unwrap().parse().unwrap())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(req_db_deliv.status, "delivered");
+
+    // 8. Rejecting vendor price confirmation on delivered requisition
+    let res_pub_deliv_reject = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/public/requisition/{}", token))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [{ "item_id": item_id, "confirmed_price": "300.00" }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_pub_deliv_reject.status(), StatusCode::BAD_REQUEST);
+    let pub_reject_body = res_pub_deliv_reject.into_body().collect().await.unwrap().to_bytes();
+    let pub_reject_json: Value = serde_json::from_slice(&pub_reject_body).unwrap();
+    assert!(pub_reject_json["error"].as_str().unwrap().contains("already been delivered or closed"));
+
+    // 9. Re-sharing an accepted requisition preserves 'accepted' status
+    let p2 = create_product(&pool, "Accepted Prod", Decimal::new(100, 2), "Beverages").await.unwrap();
+    let res_create_acc = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/requisitions")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "title": "Accepted Reshare Test",
+                    "items": [{ "product_id": p2.id, "quantity": 5, "expected_price": "100.00" }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let created_acc: Value = serde_json::from_slice(&res_create_acc.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    let acc_req_id = created_acc["id"].as_str().unwrap();
+    let acc_token = created_acc["token"].as_str().unwrap();
+    let acc_item_id = created_acc["items"][0]["id"].as_str().unwrap();
+
+    // Share to 'sent'
+    let _ = app.clone().oneshot(
+        Request::builder().method("POST").uri(format!("/api/requisitions/{}/share", acc_req_id)).body(Body::empty()).unwrap(),
+    ).await.unwrap();
+
+    // Reject duplicate item_ids on vendor confirmation
+    let res_pub_dup = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/public/requisition/{}", acc_token))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [
+                        { "item_id": acc_item_id, "confirmed_price": "105.00" },
+                        { "item_id": acc_item_id, "confirmed_price": "110.00" }
+                    ]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_pub_dup.status(), StatusCode::BAD_REQUEST);
+    let pub_dup_body = res_pub_dup.into_body().collect().await.unwrap().to_bytes();
+    let pub_dup_json: Value = serde_json::from_slice(&pub_dup_body).unwrap();
+    assert!(pub_dup_json["error"].as_str().unwrap().contains("Duplicate item_id"));
+
+    // Vendor confirms price -> transitions to 'accepted'
+    let res_conf = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/public/requisition/{}", acc_token))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [{ "item_id": acc_item_id, "confirmed_price": "105.00" }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_conf.status(), StatusCode::OK);
+
+    // Re-share accepted requisition -> preserves 'accepted'
+    let res_reshare_acc = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/share", acc_req_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_reshare_acc.status(), StatusCode::OK);
+    let reshare_acc_json: Value = serde_json::from_slice(&res_reshare_acc.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    assert_eq!(reshare_acc_json["status"], "accepted");
+
+    let req_db_acc = backend::features::requisitions::repository::get_requisition_by_id(&pool, acc_req_id.parse().unwrap())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(req_db_acc.status, "accepted");
+}
+
 

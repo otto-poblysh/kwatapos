@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use rust_decimal::Decimal;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -171,14 +173,18 @@ pub async fn share_requisition(
 ) -> Result<ShareRequisitionResponse, RequisitionError> {
     let mut tx = pool.begin().await.map_err(RequisitionError::Database)?;
 
-    let _existing = repository::get_requisition_by_id_tx(&mut tx, id)
+    let existing = repository::get_requisition_by_id_tx(&mut tx, id)
         .await
         .map_err(RequisitionError::Database)?
         .ok_or_else(|| RequisitionError::NotFound(format!("Requisition {id} not found")))?;
 
-    let updated = repository::update_requisition_status_tx(&mut tx, id, "sent")
-        .await
-        .map_err(RequisitionError::Database)?;
+    let updated = if existing.status == "draft" {
+        repository::update_requisition_status_tx(&mut tx, id, "sent")
+            .await
+            .map_err(RequisitionError::Database)?
+    } else {
+        existing
+    };
 
     tx.commit().await.map_err(RequisitionError::Database)?;
 
@@ -208,7 +214,7 @@ pub async fn deliver_requisition(
 
     if existing.status != "sent" && existing.status != "accepted" && existing.status != "partial_delivery" {
         return Err(RequisitionError::InvalidStatus(format!(
-            "Cannot deliver requisition in '{}' status. Expected 'sent' or 'accepted'",
+            "Cannot deliver requisition in '{}' status. Expected 'sent', 'accepted', or 'partial_delivery'",
             existing.status
         )));
     }
@@ -217,6 +223,15 @@ pub async fn deliver_requisition(
         return Err(RequisitionError::ValidationError(
             "At least one item is required in delivery".to_string(),
         ));
+    }
+
+    let mut seen_items = HashSet::new();
+    for item in &req.items {
+        if !seen_items.insert(item.item_id) {
+            return Err(RequisitionError::ValidationError(
+                "Duplicate item_id in request".to_string(),
+            ));
+        }
     }
 
     let existing_items = repository::get_requisition_items_tx(&mut tx, id)
@@ -240,6 +255,20 @@ pub async fn deliver_requisition(
                 ))
             })?;
 
+        let current_received = item_detail.received_quantity.unwrap_or(0);
+        if item.received_quantity < current_received {
+            return Err(RequisitionError::ValidationError(
+                "Received quantity cannot decrease from previous delivery".to_string(),
+            ));
+        }
+
+        let delta = item.received_quantity - current_received;
+        if delta > 0 {
+            repository::increment_inventory_tx(&mut tx, item_detail.product_id, delta)
+                .await
+                .map_err(RequisitionError::Database)?;
+        }
+
         repository::update_item_received_quantity_tx(
             &mut tx,
             item.item_id,
@@ -247,10 +276,6 @@ pub async fn deliver_requisition(
         )
         .await
         .map_err(RequisitionError::Database)?;
-
-        repository::increment_inventory_tx(&mut tx, item_detail.product_id, item.received_quantity)
-            .await
-            .map_err(RequisitionError::Database)?;
     }
 
     let updated_items = repository::get_requisition_items_tx(&mut tx, id)
@@ -290,10 +315,17 @@ pub async fn pay_requisition(
 ) -> Result<RequisitionDetailResponse, RequisitionError> {
     let mut tx = pool.begin().await.map_err(RequisitionError::Database)?;
 
-    let _existing = repository::get_requisition_by_id_tx(&mut tx, id)
+    let existing = repository::get_requisition_by_id_tx(&mut tx, id)
         .await
         .map_err(RequisitionError::Database)?
         .ok_or_else(|| RequisitionError::NotFound(format!("Requisition {id} not found")))?;
+
+    if existing.status != "accepted" && existing.status != "partial_delivery" && existing.status != "delivered" {
+        return Err(RequisitionError::InvalidStatus(format!(
+            "Cannot pay requisition in '{}' status. Expected 'accepted', 'partial_delivery', or 'delivered'",
+            existing.status
+        )));
+    }
 
     let updated = repository::update_requisition_status_tx(&mut tx, id, "paid")
         .await
@@ -352,10 +384,35 @@ pub async fn confirm_public_requisition(
         .map_err(RequisitionError::Database)?
         .ok_or_else(|| RequisitionError::NotFound(format!("Requisition token {token} not found")))?;
 
+    if requisition.status == "delivered"
+        || requisition.status == "partial_delivery"
+        || requisition.status == "paid"
+    {
+        return Err(RequisitionError::InvalidStatus(
+            "Requisition has already been delivered or closed".to_string(),
+        ));
+    }
+
+    if requisition.status != "sent" && requisition.status != "accepted" {
+        return Err(RequisitionError::InvalidStatus(format!(
+            "Cannot confirm prices for requisition in '{}' status. Expected 'sent' or 'accepted'",
+            requisition.status
+        )));
+    }
+
     if req.items.is_empty() {
         return Err(RequisitionError::ValidationError(
             "At least one confirmed price item is required".to_string(),
         ));
+    }
+
+    let mut seen_items = HashSet::new();
+    for item in &req.items {
+        if !seen_items.insert(item.item_id) {
+            return Err(RequisitionError::ValidationError(
+                "Duplicate item_id in request".to_string(),
+            ));
+        }
     }
 
     let existing_items = repository::get_requisition_items_tx(&mut tx, requisition.id)
