@@ -85,6 +85,7 @@ describe('useCartStore', () => {
 
     expect(useCartStore.getState().totalItems()).toBe(3);
     expect(useCartStore.getState().totalPrice()).toBe(3500);
+    expect(useCartStore.getState().totalAmount()).toBe(3500);
     expect(useCartStore.getState().getTotalItems()).toBe(3);
     expect(useCartStore.getState().getTotalPrice()).toBe(3500);
   });

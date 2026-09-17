@@ -150,5 +150,54 @@ describe('SalesDashboard Component', () => {
       expect(screen.getByText('Current Order')).toBeTruthy();
       expect(screen.getByText('Your cart is empty')).toBeTruthy();
     });
+
+    it('refetches products and updates stock badge after successful checkout', async () => {
+      let fetchCount = 0;
+      global.fetch = jest.fn().mockImplementation(async (url: string) => {
+        if (url.includes('/api/products')) {
+          fetchCount++;
+          return {
+            ok: true,
+            json: async () => [
+              {
+                id: 'prod-1',
+                name: 'Castel Beer 65cl',
+                price: 1000,
+                category: 'Beer',
+                quantity: fetchCount === 1 ? 20 : 19,
+              },
+            ],
+          };
+        }
+        if (url.includes('/api/orders/cash')) {
+          return {
+            ok: true,
+            status: 201,
+            json: async () => ({
+              id: 'order-1',
+              total_amount: 1000,
+              items: [],
+            }),
+          };
+        }
+        return { ok: true, json: async () => [] };
+      });
+
+      render(<SalesDashboard />);
+
+      await waitFor(() => {
+        expect(screen.getByText('20 in stock')).toBeTruthy();
+      });
+
+      const addBtn = screen.getByTestId('product-add-prod-1');
+      fireEvent.press(addBtn);
+
+      const checkoutBtn = screen.getByRole('button', { name: /checkout \(cash\)/i });
+      fireEvent.press(checkoutBtn);
+
+      await waitFor(() => {
+        expect(screen.getByText('19 in stock')).toBeTruthy();
+      });
+    });
   });
 });

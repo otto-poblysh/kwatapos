@@ -138,4 +138,38 @@ describe('CartSidebar', () => {
     // Cart should NOT be cleared on failure
     expect(useCartStore.getState().items).toHaveLength(1);
   });
+
+  it('clears success message when new items are added to the cart', async () => {
+    useCartStore.getState().addItem(mockProduct1);
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => ({
+        id: 'order-123',
+        payment_method: 'cash',
+        status: 'completed',
+        total_amount: 1000,
+        items: [],
+      }),
+    });
+
+    render(<CartSidebar apiBaseUrl="http://127.0.0.1:3014" />);
+
+    const checkoutBtn = screen.getByRole('button', { name: /checkout \(cash\)/i });
+    fireEvent.press(checkoutBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('checkout-success-banner')).toBeTruthy();
+    });
+
+    // Add a new item to the cart (wrapped in act)
+    await waitFor(() => {
+      useCartStore.getState().addItem(mockProduct2);
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('checkout-success-banner')).toBeNull();
+    });
+  });
 });

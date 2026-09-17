@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,16 +15,19 @@ export interface ProductGridProps {
   apiBaseUrl?: string;
   initialProducts?: Product[];
   onAddToCart?: (product: Product) => void;
+  refreshTrigger?: number;
 }
 
 export function ProductGrid({
   apiBaseUrl,
   initialProducts,
   onAddToCart,
+  refreshTrigger,
 }: ProductGridProps) {
   const [products, setProducts] = useState<Product[]>(initialProducts ?? []);
   const [loading, setLoading] = useState<boolean>(!initialProducts);
   const [error, setError] = useState<string | null>(null);
+  const isMountedRef = useRef<boolean>(true);
 
   const addItemToCart = useCartStore((state) => state.addItem);
   const handleAddToCart = onAddToCart ?? addItemToCart;
@@ -33,6 +36,13 @@ export function ProductGrid({
   const numColumns = width >= 900 ? 3 : width >= 500 ? 2 : 1;
 
   const baseUrl = apiBaseUrl ?? getApiBaseUrl();
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -43,41 +53,25 @@ export function ProductGrid({
         throw new Error(`Failed to fetch products (${res.status})`);
       }
       const data = await res.json();
-      setProducts(data);
+      if (isMountedRef.current) {
+        setProducts(data);
+      }
     } catch (err: any) {
-      setError(err?.message || 'Failed to load products');
+      if (isMountedRef.current) {
+        setError(err?.message || 'Failed to load products');
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   }, [baseUrl]);
 
   useEffect(() => {
-    let isMounted = true;
     if (!initialProducts) {
-      setLoading(true);
-      setError(null);
-      fetch(`${baseUrl}/api/products`)
-        .then((res) => {
-          if (!res.ok) throw new Error(`Failed to fetch products (${res.status})`);
-          return res.json();
-        })
-        .then((data) => {
-          if (isMounted) {
-            setProducts(data);
-            setLoading(false);
-          }
-        })
-        .catch((err) => {
-          if (isMounted) {
-            setError(err?.message || 'Failed to load products');
-            setLoading(false);
-          }
-        });
+      fetchProducts();
     }
-    return () => {
-      isMounted = false;
-    };
-  }, [baseUrl, initialProducts]);
+  }, [fetchProducts, initialProducts, refreshTrigger]);
 
   if (loading) {
     return (

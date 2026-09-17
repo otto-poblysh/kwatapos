@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -32,6 +32,12 @@ export function CartSidebar({
   const [isCheckingOut, setIsCheckingOut] = useState<boolean>(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (items.length > 0 && successMessage) {
+      setSuccessMessage(null);
+    }
+  }, [items.length, successMessage]);
 
   const baseUrl = apiBaseUrl ?? getApiBaseUrl();
 

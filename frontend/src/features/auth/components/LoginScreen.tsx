@@ -123,19 +123,6 @@ export default function LoginScreen({ onLogin, isLoading = false, error = null }
               <Text style={styles.buttonText}>Login</Text>
             )}
           </TouchableOpacity>
-
-          <TouchableOpacity
-            testID="quick-sales-button"
-            onPress={() => {
-              setEmail('sales@kwatapos.com');
-              setPassword('sales123');
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Quick Fill Sales"
-            style={styles.quickFillButton}
-          >
-            <Text style={styles.quickFillText}>Quick Fill: Sales Staff</Text>
-          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -224,15 +211,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
-  },
-  quickFillButton: {
-    marginTop: 14,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  quickFillText: {
-    color: '#8E8E93',
-    fontSize: 13,
-    fontWeight: '600',
   },
 });

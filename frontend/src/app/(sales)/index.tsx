@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,11 @@ export default function SalesDashboard() {
   const { user, logout } = useAuth();
   const { width } = useWindowDimensions();
   const [activeTab, setActiveTab] = useState<'products' | 'cart'>('products');
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const handleCheckoutSuccess = useCallback(() => {
+    setRefreshTrigger((prev) => prev + 1);
+  }, []);
 
   const totalItems = useCartStore((state) => state.totalItems());
   const totalPrice = useCartStore((state) => state.totalPrice());
@@ -93,10 +98,10 @@ export default function SalesDashboard() {
       {isWide ? (
         <View style={styles.wideLayout}>
           <View style={styles.gridSection}>
-            <ProductGrid />
+            <ProductGrid refreshTrigger={refreshTrigger} />
           </View>
           <View style={styles.cartSection}>
-            <CartSidebar />
+            <CartSidebar onCheckoutSuccess={handleCheckoutSuccess} />
           </View>
         </View>
       ) : (
@@ -107,7 +112,7 @@ export default function SalesDashboard() {
               activeTab !== 'products' && styles.hiddenView,
             ]}
           >
-            <ProductGrid />
+            <ProductGrid refreshTrigger={refreshTrigger} />
             {totalItems > 0 && (
               <TouchableOpacity
                 style={styles.floatingCartBar}
@@ -132,7 +137,7 @@ export default function SalesDashboard() {
               activeTab !== 'cart' && styles.hiddenView,
             ]}
           >
-            <CartSidebar />
+            <CartSidebar onCheckoutSuccess={handleCheckoutSuccess} />
           </View>
         </View>
       )}
