@@ -29,6 +29,36 @@ export default function AdminDashboard() {
 
           <TouchableOpacity
             style={styles.reportButton}
+            onPress={() => router.push('/(admin)/team')}
+            accessibilityRole="button"
+            accessibilityLabel="Team"
+            testID="team-btn"
+          >
+            <Text style={styles.reportButtonText}>Team</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.reportButton}
+            onPress={() => router.push('/(admin)/catalog')}
+            accessibilityRole="button"
+            accessibilityLabel="Catalog"
+            testID="catalog-btn"
+          >
+            <Text style={styles.reportButtonText}>Catalog</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.reportButton}
+            onPress={() => router.push('/(admin)/customers')}
+            accessibilityRole="button"
+            accessibilityLabel="Customers"
+            testID="customers-btn"
+          >
+            <Text style={styles.reportButtonText}>Customers</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.reportButton}
             onPress={() => router.push('/(admin)/reports')}
             accessibilityRole="button"
             accessibilityLabel="Daily Report"
