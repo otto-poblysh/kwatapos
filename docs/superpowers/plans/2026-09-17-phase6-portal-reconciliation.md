@@ -1,6 +1,6 @@
 # Phase 6: Customer Portal & Daily Reconciliation Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Provide end-of-day financial visibility to the business owner and credit transparency to the customers.
 
@@ -36,7 +36,7 @@
 
 *Note: Phase 5 implementation was excellent. Empty states were implemented exactly as designed, native sharing works, and expenses use the image picker. No cleanup is required.*
 
-- [ ] **Step 1: Verify Phase 5 Baseline**
+- [x] **Step 1: Verify Phase 5 Baseline**
 Ensure `cargo test` and `npm run test` still pass before beginning Phase 6.
 
 ---
@@ -46,13 +46,13 @@ Ensure `cargo test` and `npm run test` still pass before beginning Phase 6.
 **Files:**
 - Create: `backend/migrations/0009_add_pin_to_customers.sql`
 
-- [ ] **Step 1: Write Migration Files**
+- [x] **Step 1: Write Migration Files**
 Update `customers` table: Add `pin_hash` (VARCHAR). For existing records, set a default hashed PIN (e.g., '0000').
-- [ ] **Step 2: Run Migrations**
+- [x] **Step 2: Run Migrations**
 Run `sqlx migrate run`.
-- [ ] **Step 3: Update Customer Repository**
+- [x] **Step 3: Update Customer Repository**
 Modify customer creation logic to accept and hash a 4-digit PIN. Update the `/api/customers` POST endpoint to require a PIN when creating a customer.
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 `git commit -m "feat: add PIN authentication support for customers"`
 
 ---
@@ -64,15 +64,15 @@ Modify customer creation logic to accept and hash a 4-digit PIN. Update the `/ap
 - Create: `backend/src/features/reports/mod.rs` (Service, Controller)
 - Create: `backend/tests/reports_test.rs`
 
-- [ ] **Step 1: RED - Write the failing tests**
+- [x] **Step 1: RED - Write the failing tests**
 Write tests asserting that a customer can login with phone/PIN and get a JWT. Write tests asserting that `GET /api/reports/daily` returns expected aggregated totals.
-- [ ] **Step 2: GREEN - Implement Customer Auth**
+- [x] **Step 2: GREEN - Implement Customer Auth**
 Create `POST /api/auth/customer` that verifies the PIN and issues a JWT with `role: "customer"`. Create `GET /api/customer/me` that returns the authenticated customer's details and their `credits` history.
-- [ ] **Step 3: GREEN - Implement Daily Reports API**
+- [x] **Step 3: GREEN - Implement Daily Reports API**
 Create `GET /api/reports/daily`. Use SQL `SUM()` and `GROUP BY` to aggregate today's `orders` by `payment_method`, and today's approved `direct_expenses`. Calculate `expected_cash_drawer = (total_cash_sales - total_cash_expenses)`.
-- [ ] **Step 4: REFACTOR & Verify**
+- [x] **Step 4: REFACTOR & Verify**
 Run `cargo test`.
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git commit -m "feat: implement customer auth and daily reconciliation APIs"`
 
 ---
@@ -84,13 +84,13 @@ Run `cargo test`.
 - Create: `frontend/src/app/customer/dashboard.tsx`
 - Modify: `frontend/src/core/context/AuthContext.tsx`
 
-- [ ] **Step 1: Update Auth Context**
+- [x] **Step 1: Update Auth Context**
 Ensure the context supports the `customer` role and redirects appropriately upon login.
-- [ ] **Step 2: Build Customer Login**
+- [x] **Step 2: Build Customer Login**
 Create a clean, flat-design login screen asking for Phone Number and PIN.
-- [ ] **Step 3: Build Customer Dashboard**
+- [x] **Step 3: Build Customer Dashboard**
 Create a read-only view displaying the massive "Total Owed" prominently, followed by a list of past credit orders with dates.
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 `git commit -m "feat: implement frontend customer portal"`
 
 ---
@@ -100,11 +100,11 @@ Create a read-only view displaying the massive "Total Owed" prominently, followe
 **Files:**
 - Create: `frontend/src/app/(admin)/reports.tsx`
 
-- [ ] **Step 1: Build the Reports Dashboard**
+- [x] **Step 1: Build the Reports Dashboard**
 Create a dashboard specifically for the Super Admin. Fetch data from `/api/reports/daily`.
-- [ ] **Step 2: Implement Financial Summary Cards**
+- [x] **Step 2: Implement Financial Summary Cards**
 Display large, high-contrast cards for "Total Sales", "Expected Cash in Drawer", "Credit Issued Today", and "Direct Expenses".
-- [ ] **Step 3: Capture UAT Screenshots**
+- [x] **Step 3: Capture UAT Screenshots**
 Run the simulator. Capture the Customer Portal login, the Customer Dashboard, and the Super Admin Reports Dashboard.
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 `git commit -m "feat: implement super admin daily reconciliation dashboard"`

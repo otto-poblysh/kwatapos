@@ -1,10 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useAuth } from '../../core/hooks/useAuth';
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
+  const router = useRouter();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -24,6 +26,16 @@ export default function AdminDashboard() {
               <Text style={styles.roleText}>{user?.role ?? 'admin'}</Text>
             </View>
           </View>
+
+          <TouchableOpacity
+            style={styles.reportButton}
+            onPress={() => router.push('/(admin)/reports')}
+            accessibilityRole="button"
+            accessibilityLabel="Daily Report"
+            testID="daily-report-btn"
+          >
+            <Text style={styles.reportButtonText}>Daily Report</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.logoutButton}
@@ -108,7 +120,20 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 24,
     alignItems: 'center',
+    marginTop: 12,
+  },
+  reportButton: {
+    backgroundColor: '#000000',
+    borderRadius: 9999,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    alignItems: 'center',
     marginTop: 24,
+  },
+  reportButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
   },
   logoutText: {
     color: '#FFFFFF',
