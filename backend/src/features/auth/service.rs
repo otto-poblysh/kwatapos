@@ -1,5 +1,5 @@
 use argon2::{
-    password_hash::{PasswordHash, PasswordVerifier},
+    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
@@ -50,6 +50,12 @@ pub fn get_jwt_secret() -> String {
     std::env::var("JWT_SECRET").unwrap_or_else(|_| {
         "kwatapos_default_jwt_secret_dev_key_change_in_production".to_string()
     })
+}
+
+pub fn hash_password(password: &str) -> Result<String, argon2::password_hash::Error> {
+    let salt = SaltString::from_b64("dGVzdHNhbHQxMjM0NTY3OA").unwrap();
+    let hash = Argon2::default().hash_password(password.as_bytes(), &salt)?;
+    Ok(hash.to_string())
 }
 
 pub fn verify_password(password: &str, password_hash: &str) -> bool {

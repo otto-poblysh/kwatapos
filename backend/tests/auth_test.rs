@@ -25,6 +25,16 @@ async fn test_app() -> axum::Router {
 }
 
 #[tokio::test]
+async fn test_hash_generation() {
+    let admin_hash = backend::features::auth::service::hash_password("admin123").unwrap();
+    let manager_hash = backend::features::auth::service::hash_password("manager123").unwrap();
+    let sales_hash = backend::features::auth::service::hash_password("sales123").unwrap();
+    assert!(backend::features::auth::service::verify_password("admin123", &admin_hash));
+    assert!(backend::features::auth::service::verify_password("manager123", &manager_hash));
+    assert!(backend::features::auth::service::verify_password("sales123", &sales_hash));
+}
+
+#[tokio::test]
 async fn test_login_success() {
     let app = test_app().await;
     let payload = json!({
@@ -55,6 +65,64 @@ async fn test_login_success() {
     assert_eq!(json["user"]["email"], "admin@kwatapos.com");
     // Ensure password_hash is never leaked in the user object
     assert!(json["user"].get("password_hash").is_none());
+}
+
+#[tokio::test]
+async fn test_login_manager_success() {
+    let app = test_app().await;
+    let payload = json!({
+        "email": "manager@kwatapos.com",
+        "password": "manager123"
+    });
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/auth/login")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&payload).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let json: Value = serde_json::from_slice(&body).unwrap();
+
+    assert_eq!(json["user"]["role"], "manager");
+    assert_eq!(json["user"]["email"], "manager@kwatapos.com");
+}
+
+#[tokio::test]
+async fn test_login_sales_success() {
+    let app = test_app().await;
+    let payload = json!({
+        "email": "sales@kwatapos.com",
+        "password": "sales123"
+    });
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/auth/login")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&payload).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let json: Value = serde_json::from_slice(&body).unwrap();
+
+    assert_eq!(json["user"]["role"], "sales");
+    assert_eq!(json["user"]["email"], "sales@kwatapos.com");
 }
 
 #[tokio::test]
