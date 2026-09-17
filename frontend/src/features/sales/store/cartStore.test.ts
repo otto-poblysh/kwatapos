@@ -89,4 +89,39 @@ describe('useCartStore', () => {
     expect(useCartStore.getState().getTotalItems()).toBe(3);
     expect(useCartStore.getState().getTotalPrice()).toBe(3500);
   });
+
+  it('initializes with activeOrderId and activeOrderName as null', () => {
+    expect(useCartStore.getState().activeOrderId).toBeNull();
+    expect(useCartStore.getState().activeOrderName).toBeNull();
+  });
+
+  it('sets active order details and items via setActiveOrder', () => {
+    useCartStore.getState().setActiveOrder('order-123', 'Table 4', [
+      { product: mockProduct1, quantity: 2 },
+    ]);
+
+    expect(useCartStore.getState().activeOrderId).toBe('order-123');
+    expect(useCartStore.getState().activeOrderName).toBe('Table 4');
+    expect(useCartStore.getState().items).toHaveLength(1);
+    expect(useCartStore.getState().items[0]).toEqual({
+      product: mockProduct1,
+      quantity: 2,
+    });
+    expect(useCartStore.getState().totalPrice()).toBe(2000);
+  });
+
+  it('clears active order and resets items via clearActiveOrder', () => {
+    useCartStore.getState().setActiveOrder('order-123', 'Table 4', [
+      { product: mockProduct1, quantity: 2 },
+    ]);
+
+    expect(useCartStore.getState().activeOrderId).toBe('order-123');
+    expect(useCartStore.getState().items).toHaveLength(1);
+
+    useCartStore.getState().clearActiveOrder();
+
+    expect(useCartStore.getState().activeOrderId).toBeNull();
+    expect(useCartStore.getState().activeOrderName).toBeNull();
+    expect(useCartStore.getState().items).toHaveLength(0);
+  });
 });

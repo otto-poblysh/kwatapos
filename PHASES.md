@@ -42,27 +42,30 @@ To ensure steady progress and allow for regular team reviews, the development of
 
 ---
 
-## Phase 4: The Credit System
-**Goal:** Implement the critical business requirement of tracking unpaid tabs.
+## Phase 4: Open Orders & Flexible Checkout (Tabs & Credit)
+**Goal:** Align the POS with real-world bar operations by allowing staff to keep orders open over time and settle them with various payment methods.
 **Tasks:**
-- Create `customers` and `credits` database tables.
-- Build the "Mark as Credit" checkout flow in the POS.
-- Implement the flow to search for existing customers by phone number or quickly add a new customer during checkout.
-- Build a view for Sales Staff to see outstanding tabs.
+- Modify the `orders` database schema to include `status` (Open, Closed), `order_name` (e.g., Table 4), and `payment_method` (Cash, Card, Transfer, Credit).
+- Build backend APIs to Create an Open Order, Append items to it, and Settle it.
+- Create the `customers` and `credits` database tables to support the Credit payment method.
+- Redesign the Sales Frontend: The primary view becomes a grid of "Open Orders".
+- Build the Flexible Settlement Modal: When settling, staff can choose Card, Transfer, Cash, or Credit (which triggers the customer phone number capture).
 **Deliverable (Demo):** 
-> A Sales Staff member processes a large order and selects "Credit". They quickly add a new customer's name and phone number. The order is finalized without cash, and the customer's outstanding balance is displayed.
+> A Sales Staff member creates an order for "Table 4". Over an hour, they append three rounds of drinks to it. Finally, they open the order, hit "Settle", and select "Bank Transfer". The order is closed and inventory is properly decremented.
 
 ---
 
-## Phase 5: Inventory Requisitions
-**Goal:** Empower Store Managers to restock without physical travel, and Super Admins to maintain control.
+## Phase 5: Inventory Requisitions, Vendor Collaboration & Direct Expenses
+**Goal:** Empower Managers to restock efficiently via native sharing, collaborate with external vendors, and process direct cash expenses transparently.
 **Tasks:**
-- Create `requisitions` database tables with status tracking (Pending, Approved, Received).
-- Build the Store Manager UI to view low stock and submit a restock request.
-- Build the Super Admin UI to review pending requisitions, compare against current stock, and approve them.
-- Build the Store Manager flow to mark an approved requisition as "Received" to officially update inventory.
+- Create `requisitions` and `direct_expenses` tables.
+- Build the Manager UI to draft requisitions showing the *last purchase price*.
+- Implement `expo-sharing` and `expo-print` to generate a PDF/Link and share it natively (e.g., to WhatsApp).
+- Build a lightweight external Web UI for the Vendor to confirm or adjust prices.
+- Implement the "Delivery & Payment" flow: Manager marks items as Received (adjusting quantities if necessary), and later marks the invoice as Paid.
+- Build the Direct Expense flow: Shop keeper requests cash, manager approves, shop keeper uploads the physical receipt via `expo-camera`/`expo-image-picker`.
 **Deliverable (Demo):** 
-> A Store Manager submits a request for 5 crates of beer. The Super Admin logs in, sees the notification, and clicks "Approve". The Store Manager later clicks "Received", and the beer inventory instantly increases by the requested amount.
+> A Manager drafts a requisition for Beer and taps "Share". WhatsApp opens. The vendor clicks the shared link, updates a price, and submits. The Manager sees the update, accepts it, and later logs that only 8 of 10 crates were actually delivered, finally marking the adjusted invoice as Paid. Meanwhile, a Shop Keeper requests 5,000 FCFA for soap, marks it received, and uploads a photo of the receipt.
 
 ---
 

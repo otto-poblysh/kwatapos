@@ -172,4 +172,87 @@ describe('CartSidebar', () => {
       expect(screen.queryByTestId('checkout-success-banner')).toBeNull();
     });
   });
+
+  describe('Tab Mode', () => {
+    beforeEach(() => {
+      useCartStore.getState().setActiveOrder('order-tab-1', 'Table 4', [
+        { product: mockProduct1, quantity: 2 },
+      ]);
+    });
+
+    it('renders Save Tab and Settle Tab buttons instead of Checkout Cash', () => {
+      render(
+        <CartSidebar
+          apiBaseUrl="http://127.0.0.1:3014"
+          mode="tab"
+        />
+      );
+
+      expect(screen.queryByRole('button', { name: /checkout \(cash\)/i })).toBeNull();
+      expect(screen.getByRole('button', { name: /save tab/i })).toBeTruthy();
+      expect(screen.getByRole('button', { name: /settle tab/i })).toBeTruthy();
+    });
+
+    it('saves tab items via PUT /api/orders/:id/items and displays green success banner', async () => {
+      const mockSaveTab = jest.fn();
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          id: 'order-tab-1',
+          order_name: 'Table 4',
+          total_amount: 2000,
+          items: [],
+        }),
+      });
+
+      render(
+        <CartSidebar
+          apiBaseUrl="http://127.0.0.1:3014"
+          mode="tab"
+          onSaveTab={mockSaveTab}
+        />
+      );
+
+      const saveBtn = screen.getByRole('button', { name: /save tab/i });
+      fireEvent.press(saveBtn);
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          'http://127.0.0.1:3014/api/orders/order-tab-1/items',
+          expect.objectContaining({
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              items: [{ product_id: 'prod-1', quantity: 2 }],
+            }),
+          })
+        );
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('checkout-success-banner')).toBeTruthy();
+        expect(screen.getByText('Tab saved successfully!')).toBeTruthy();
+      });
+
+      expect(mockSaveTab).toHaveBeenCalled();
+    });
+
+    it('invokes onSettleTab when Settle Tab button is clicked', () => {
+      const mockSettleTab = jest.fn();
+
+      render(
+        <CartSidebar
+          apiBaseUrl="http://127.0.0.1:3014"
+          mode="tab"
+          onSettleTab={mockSettleTab}
+        />
+      );
+
+      const settleBtn = screen.getByRole('button', { name: /settle tab/i });
+      fireEvent.press(settleBtn);
+
+      expect(mockSettleTab).toHaveBeenCalledTimes(1);
+    });
+  });
 });

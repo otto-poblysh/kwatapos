@@ -1,44 +1,51 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { useWindowDimensions } from 'react-native';
 import SalesDashboard from '../(sales)/index';
 import { useAuth } from '../../core/hooks/useAuth';
-import { useCartStore } from '../../features/sales/store/cartStore';
 
 jest.mock('../../core/hooks/useAuth', () => ({
   useAuth: jest.fn(),
 }));
 
-jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
-  default: jest.fn(),
+const mockPush = jest.fn();
+const mockReplace = jest.fn();
+
+jest.mock('expo-router', () => ({
+  useRouter: () => ({
+    push: mockPush,
+    replace: mockReplace,
+  }),
+  useLocalSearchParams: () => ({}),
 }));
 
-const mockProducts = [
+const mockOrders = [
   {
-    id: 'prod-1',
-    name: 'Castel Beer 65cl',
-    price: 1000,
-    category: 'Beer',
-    quantity: 20,
+    id: 'order-1',
+    order_name: 'Table 4',
+    payment_method: null,
+    total_amount: 2600,
+    status: 'open',
+    items_count: 3,
+    created_at: '2026-09-17T12:00:00Z',
+    updated_at: '2026-09-17T12:30:00Z',
   },
   {
-    id: 'prod-2',
-    name: 'Guinness Foreign Extra',
-    price: 1500,
-    category: 'Stout',
-    quantity: 10,
+    id: 'order-2',
+    order_name: 'VIP Lounge',
+    payment_method: null,
+    total_amount: 15000,
+    status: 'open',
+    items_count: 5,
+    created_at: '2026-09-17T13:00:00Z',
+    updated_at: '2026-09-17T13:15:00Z',
   },
 ];
 
-describe('SalesDashboard Component', () => {
+describe('Open Orders Dashboard', () => {
   const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
-  const mockUseWindowDimensions = useWindowDimensions as jest.MockedFunction<
-    typeof useWindowDimensions
-  >;
   const mockLogout = jest.fn();
 
   beforeEach(() => {
-    useCartStore.getState().clearCart();
     jest.clearAllMocks();
 
     mockUseAuth.mockReturnValue({
@@ -50,154 +57,124 @@ describe('SalesDashboard Component', () => {
       logout: mockLogout,
     });
 
+    global.fetch = jest.fn().mockImplementation(async (url: string) => {
+      if (url.includes('/api/orders')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => mockOrders,
+        };
+      }
+      return { ok: true, status: 200, json: async () => [] };
+    });
+  });
+
+  it('renders header with user email, role, log out button, and + New Tab button', async () => {
+    render(<SalesDashboard />);
+
+    expect(screen.getByText('sales@kwatapos.com')).toBeTruthy();
+    expect(screen.getByText('sales')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /log out/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /\+ new tab|new tab/i })).toBeTruthy();
+
+    await waitFor(() => {
+      expect(screen.getByText('Table 4')).toBeTruthy();
+    });
+  });
+
+  it('fetches and renders open tab cards with name, prominent total, item count, and open status', async () => {
+    render(<SalesDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Table 4')).toBeTruthy();
+      expect(screen.getByText('VIP Lounge')).toBeTruthy();
+    });
+
+    expect(screen.getByText('2,600 FCFA')).toBeTruthy();
+    expect(screen.getByText('15,000 FCFA')).toBeTruthy();
+    expect(screen.getByText('3 items')).toBeTruthy();
+    expect(screen.getByText('5 items')).toBeTruthy();
+    expect(screen.getAllByText('OPEN').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('displays empty state when there are no open tabs', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: async () => mockProducts,
+      status: 200,
+      json: async () => [],
+    });
+
+    render(<SalesDashboard />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/no open tabs\. tap '\+ new tab' to start an order\./i)
+      ).toBeTruthy();
     });
   });
 
-  describe('Mobile Layout (< 768px)', () => {
-    beforeEach(() => {
-      mockUseWindowDimensions.mockReturnValue({
-        width: 390,
-        height: 844,
-        scale: 3,
-        fontScale: 1,
-      });
+  it('navigates to tab detail route when tapping a tab card', async () => {
+    render(<SalesDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Table 4')).toBeTruthy();
     });
 
-    it('renders header with user email, role badge, and mobile tabs', async () => {
-      render(<SalesDashboard />);
+    const tabCard = screen.getByTestId('tab-card-order-1');
+    fireEvent.press(tabCard);
 
-      expect(screen.getByText('Sales Dashboard')).toBeTruthy();
-      expect(screen.getByText('sales@kwatapos.com')).toBeTruthy();
-      expect(screen.getByText('sales')).toBeTruthy();
-      expect(screen.getByRole('button', { name: /log out/i })).toBeTruthy();
-
-      expect(screen.getByRole('tab', { name: 'Products' })).toBeTruthy();
-      expect(screen.getByRole('tab', { name: /cart \(0\)/i })).toBeTruthy();
-
-      await waitFor(() => {
-        expect(screen.getByText('Castel Beer 65cl')).toBeTruthy();
-      });
-    });
-
-    it('shows floating quick cart bar when items are in cart and switches to cart on tap', async () => {
-      render(<SalesDashboard />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Castel Beer 65cl')).toBeTruthy();
-      });
-
-      // Add product
-      const addBtn = screen.getByTestId('product-add-prod-1');
-      fireEvent.press(addBtn);
-
-      // Floating cart bar should now be visible
-      const floatingBar = screen.getByRole('button', {
-        name: /view cart: 1 item, 1,000 fcfa/i,
-      });
-      expect(floatingBar).toBeTruthy();
-
-      // Tap floating bar -> switches to Cart tab
-      fireEvent.press(floatingBar);
-
-      // Now in cart view: CartSidebar is displayed
-      expect(screen.getByText('Current Order')).toBeTruthy();
-      expect(screen.getByRole('button', { name: /checkout \(cash\)/i })).toBeTruthy();
-    });
-
-    it('switches between Products and Cart tabs using tab buttons', async () => {
-      render(<SalesDashboard />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Castel Beer 65cl')).toBeTruthy();
-      });
-
-      const cartTab = screen.getByRole('tab', { name: /cart \(0\)/i });
-      fireEvent.press(cartTab);
-
-      expect(screen.getByText('Your cart is empty')).toBeTruthy();
-
-      const productsTab = screen.getByRole('tab', { name: 'Products' });
-      fireEvent.press(productsTab);
-
-      expect(screen.getByText('Castel Beer 65cl')).toBeTruthy();
-    });
+    expect(mockPush).toHaveBeenCalledWith('/(sales)/tab/order-1');
   });
 
-  describe('Wide Layout (>= 768px)', () => {
-    beforeEach(() => {
-      mockUseWindowDimensions.mockReturnValue({
-        width: 1024,
-        height: 768,
-        scale: 2,
-        fontScale: 1,
-      });
+  it('opens new tab modal, allows entering tab name, calls POST /api/orders, and navigates to new tab', async () => {
+    global.fetch = jest.fn().mockImplementation(async (url: string, options?: any) => {
+      if (options?.method === 'POST') {
+        return {
+          ok: true,
+          status: 201,
+          json: async () => ({
+            id: 'new-order-99',
+            order_name: 'Terrace Table 2',
+            total_amount: 0,
+            status: 'open',
+            items: [],
+          }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => mockOrders,
+      };
     });
 
-    it('renders both ProductGrid and CartSidebar side-by-side without mobile tabs', async () => {
-      render(<SalesDashboard />);
+    render(<SalesDashboard />);
 
-      // Mobile tabs should not be present
-      expect(screen.queryByRole('tab', { name: 'Products' })).toBeNull();
-
-      await waitFor(() => {
-        expect(screen.getByText('Castel Beer 65cl')).toBeTruthy();
-      });
-
-      // Cart sidebar is also rendered simultaneously
-      expect(screen.getByText('Current Order')).toBeTruthy();
-      expect(screen.getByText('Your cart is empty')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText('Table 4')).toBeTruthy();
     });
 
-    it('refetches products and updates stock badge after successful checkout', async () => {
-      let fetchCount = 0;
-      global.fetch = jest.fn().mockImplementation(async (url: string) => {
-        if (url.includes('/api/products')) {
-          fetchCount++;
-          return {
-            ok: true,
-            json: async () => [
-              {
-                id: 'prod-1',
-                name: 'Castel Beer 65cl',
-                price: 1000,
-                category: 'Beer',
-                quantity: fetchCount === 1 ? 20 : 19,
-              },
-            ],
-          };
-        }
-        if (url.includes('/api/orders/cash')) {
-          return {
-            ok: true,
-            status: 201,
-            json: async () => ({
-              id: 'order-1',
-              total_amount: 1000,
-              items: [],
-            }),
-          };
-        }
-        return { ok: true, json: async () => [] };
-      });
+    const newTabBtn = screen.getByRole('button', { name: /\+ new tab|new tab/i });
+    fireEvent.press(newTabBtn);
 
-      render(<SalesDashboard />);
+    const input = screen.getByPlaceholderText(/enter tab name/i);
+    expect(input).toBeTruthy();
 
-      await waitFor(() => {
-        expect(screen.getByText('20 in stock')).toBeTruthy();
-      });
+    fireEvent.changeText(input, 'Terrace Table 2');
 
-      const addBtn = screen.getByTestId('product-add-prod-1');
-      fireEvent.press(addBtn);
+    const createBtn = screen.getByRole('button', { name: /create tab/i });
+    fireEvent.press(createBtn);
 
-      const checkoutBtn = screen.getByRole('button', { name: /checkout \(cash\)/i });
-      fireEvent.press(checkoutBtn);
-
-      await waitFor(() => {
-        expect(screen.getByText('19 in stock')).toBeTruthy();
-      });
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/orders'),
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order_name: 'Terrace Table 2' }),
+        })
+      );
+      expect(mockPush).toHaveBeenCalledWith('/(sales)/tab/new-order-99');
     });
   });
 });
