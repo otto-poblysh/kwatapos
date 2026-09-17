@@ -16,6 +16,14 @@ export interface CartItem {
 
 export interface CartState {
   items: CartItem[];
+  activeOrderId: string | null;
+  activeOrderName: string | null;
+  setActiveOrder: (
+    orderId: string | null,
+    orderName: string | null,
+    items?: CartItem[]
+  ) => void;
+  clearActiveOrder: () => void;
   addItem: (product: Product) => void;
   removeItem: (productId: string) => void;
   decrementItem: (productId: string) => void;
@@ -29,6 +37,24 @@ export interface CartState {
 
 export const useCartStore = create<CartState>((set, get) => ({
   items: [],
+  activeOrderId: null,
+  activeOrderName: null,
+
+  setActiveOrder: (orderId, orderName, items) => {
+    set({
+      activeOrderId: orderId,
+      activeOrderName: orderName,
+      items: items ?? [],
+    });
+  },
+
+  clearActiveOrder: () => {
+    set({
+      activeOrderId: null,
+      activeOrderName: null,
+      items: [],
+    });
+  },
 
   addItem: (product: Product) => {
     const itemProduct = {

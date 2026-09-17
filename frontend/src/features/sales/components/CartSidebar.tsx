@@ -8,20 +8,28 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { getApiBaseUrl } from '../../../core/context/AuthContext';
-import { useCartStore } from '../store/cartStore';
+import { useCartStore, CartItem } from '../store/cartStore';
 
 export interface CartSidebarProps {
   apiBaseUrl?: string;
   onCheckoutSuccess?: (order: any) => void;
   onCheckoutError?: (error: string) => void;
+  mode?: 'tab' | 'cash';
+  onSaveTab?: () => Promise<void> | void;
+  onSettleTab?: () => void;
 }
 
 export function CartSidebar({
   apiBaseUrl,
   onCheckoutSuccess,
   onCheckoutError,
+  mode,
+  onSaveTab,
+  onSettleTab,
 }: CartSidebarProps) {
   const items = useCartStore((state) => state.items);
+  const activeOrderId = useCartStore((state) => state.activeOrderId);
+  const activeOrderName = useCartStore((state) => state.activeOrderName);
   const addItem = useCartStore((state) => state.addItem);
   const decrementItem = useCartStore((state) => state.decrementItem);
   const removeItem = useCartStore((state) => state.removeItem);
@@ -29,17 +37,73 @@ export function CartSidebar({
   const totalPrice = useCartStore((state) => state.totalPrice());
   const totalItems = useCartStore((state) => state.totalItems());
 
+  const isTabMode = mode === 'tab' || (mode !== 'cash' && Boolean(activeOrderId));
+
   const [isCheckingOut, setIsCheckingOut] = useState<boolean>(false);
+  const [isSavingTab, setIsSavingTab] = useState<boolean>(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [savedItemsSnapshot, setSavedItemsSnapshot] = useState<CartItem[] | null>(null);
 
   useEffect(() => {
-    if (items.length > 0 && successMessage) {
-      setSuccessMessage(null);
+    if (successMessage) {
+      if (savedItemsSnapshot !== null) {
+        if (items !== savedItemsSnapshot) {
+          setSuccessMessage(null);
+          setSavedItemsSnapshot(null);
+        }
+      } else {
+        if (items.length > 0) {
+          setSuccessMessage(null);
+        }
+      }
     }
-  }, [items.length, successMessage]);
+  }, [items, successMessage, savedItemsSnapshot]);
 
   const baseUrl = apiBaseUrl ?? getApiBaseUrl();
+
+  const handleSaveTab = async () => {
+    if (isSavingTab || !activeOrderId) return;
+
+    setIsSavingTab(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const payload = {
+        items: items.map((i) => ({
+          product_id: i.product.id,
+          quantity: i.quantity,
+        })),
+      };
+
+      const res = await fetch(`${baseUrl}/api/orders/${activeOrderId}/items`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (res.ok || res.status === 200) {
+        setSuccessMessage('Tab saved successfully!');
+        setSavedItemsSnapshot(items);
+        if (onSaveTab) {
+          await onSaveTab();
+        }
+      } else {
+        const errorText = data?.error || `Failed to save tab (${res.status})`;
+        setErrorMessage(errorText);
+      }
+    } catch (err: any) {
+      const errorText = err?.message || 'Network error while saving tab';
+      setErrorMessage(errorText);
+    } finally {
+      setIsSavingTab(false);
+    }
+  };
 
   const handleCheckout = async () => {
     if (items.length === 0 || isCheckingOut) return;
@@ -71,6 +135,7 @@ export function CartSidebar({
         const numericTotal = typeof rawTotal === 'string' ? parseFloat(rawTotal) : Number(rawTotal);
         const totalFormatted = `${(isNaN(numericTotal) ? rawTotal : numericTotal).toLocaleString()} FCFA`;
         const successMsg = `Order completed successfully! Total: ${totalFormatted}`;
+        setSavedItemsSnapshot(null);
         setSuccessMessage(successMsg);
         clearCart();
         onCheckoutSuccess?.(data);
@@ -93,7 +158,9 @@ export function CartSidebar({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Current Order</Text>
+        <Text style={styles.title}>
+          {isTabMode && activeOrderName ? activeOrderName : 'Current Order'}
+        </Text>
         {!isCartEmpty && (
           <TouchableOpacity
             onPress={clearCart}
@@ -193,22 +260,58 @@ export function CartSidebar({
           </Text>
         </View>
 
-        <TouchableOpacity
-          style={[
-            styles.checkoutButton,
-            (isCartEmpty || isCheckingOut) && styles.disabledCheckoutButton,
-          ]}
-          onPress={handleCheckout}
-          disabled={isCartEmpty || isCheckingOut}
-          accessibilityRole="button"
-          accessibilityLabel="Checkout (Cash)"
-        >
-          {isCheckingOut ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.checkoutText}>Checkout (Cash)</Text>
-          )}
-        </TouchableOpacity>
+        {isTabMode ? (
+          <View style={styles.tabButtonsContainer}>
+            <TouchableOpacity
+              style={[
+                styles.saveTabButton,
+                isSavingTab && styles.disabledSecondaryButton,
+              ]}
+              onPress={handleSaveTab}
+              disabled={isSavingTab}
+              accessibilityRole="button"
+              accessibilityLabel="Save Tab"
+              testID="save-tab-button"
+            >
+              {isSavingTab ? (
+                <ActivityIndicator color="#000000" />
+              ) : (
+                <Text style={styles.saveTabText}>Save Tab</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.settleTabButton,
+                (isCartEmpty || isSavingTab) && styles.disabledCheckoutButton,
+              ]}
+              onPress={() => onSettleTab?.()}
+              disabled={isCartEmpty || isSavingTab}
+              accessibilityRole="button"
+              accessibilityLabel="Settle Tab"
+              testID="settle-tab-button"
+            >
+              <Text style={styles.settleTabText}>Settle Tab</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={[
+              styles.checkoutButton,
+              (isCartEmpty || isCheckingOut) && styles.disabledCheckoutButton,
+            ]}
+            onPress={handleCheckout}
+            disabled={isCartEmpty || isCheckingOut}
+            accessibilityRole="button"
+            accessibilityLabel="Checkout (Cash)"
+          >
+            {isCheckingOut ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.checkoutText}>Checkout (Cash)</Text>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -395,6 +498,43 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E5EA',
   },
   checkoutText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  tabButtonsContainer: {
+    gap: 10,
+  },
+  saveTabButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#000000',
+    borderRadius: 9999,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  disabledSecondaryButton: {
+    borderColor: '#E5E5EA',
+    opacity: 0.5,
+  },
+  saveTabText: {
+    color: '#000000',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  settleTabButton: {
+    backgroundColor: '#000000',
+    borderRadius: 9999,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  settleTabText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
