@@ -49,7 +49,7 @@ Based on our decision matrices for a POS system involving transactions, credits,
 
 | Component | Choice | Rationale |
 | :--- | :--- | :--- |
-| **Primary Database** | PostgreSQL `16+` | The system requires strict ACID compliance for financial transactions and relational mapping between Orders, Users, Credits, and Stock levels. |
+| **Primary Database** | PostgreSQL `17+` | The system requires strict ACID compliance for financial transactions and relational mapping between Orders, Users, Credits, and Stock levels. |
 | **Caching (Optional Phase 2)**| Redis | If query load increases, Redis can be introduced to cache menu items, session tokens, or real-time inventory counts. |
 
 ---
