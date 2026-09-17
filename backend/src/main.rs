@@ -9,6 +9,9 @@ async fn main() {
     let pool = match PgPoolOptions::new().max_connections(5).connect(&db_url).await {
         Ok(p) => {
             println!("Connected to PostgreSQL database at {}", db_url);
+            if let Err(e) = backend::run_migrations(&p).await {
+                eprintln!("Warning: could not run migrations: {}", e);
+            }
             Some(p)
         }
         Err(e) => {

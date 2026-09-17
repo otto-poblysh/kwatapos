@@ -5,6 +5,12 @@ use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
+pub mod features;
+
+pub async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
+    sqlx::migrate!("./migrations").run(pool).await
+}
+
 #[derive(Clone, Default)]
 pub struct AppState {
     pub pool: Option<PgPool>,
