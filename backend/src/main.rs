@@ -3,6 +3,8 @@ use sqlx::postgres::PgPoolOptions;
 
 #[tokio::main]
 async fn main() {
+    dotenvy::dotenv().ok();
+
     let db_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://kwata_admin:kwata_password@127.0.0.1:5432/kwatapos".to_string());
 

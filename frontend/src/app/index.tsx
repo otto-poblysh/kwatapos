@@ -89,11 +89,8 @@ const styles = StyleSheet.create({
     padding: 24,
     width: '100%',
     maxWidth: 420,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
   },
   title: {
     fontSize: 28,
