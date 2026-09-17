@@ -13,6 +13,7 @@ import { getApiBaseUrl } from '../../../core/context/AuthContext';
 import { useCartStore, CartItem } from '../../../features/sales/store/cartStore';
 import { ProductGrid } from '../../../features/sales/components/ProductGrid';
 import { CartSidebar } from '../../../features/sales/components/CartSidebar';
+import { SettlementModal } from '../../../features/sales/components/SettlementModal';
 
 export interface OrderItemDetail {
   id: string;
@@ -51,6 +52,7 @@ export default function TabDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'products' | 'cart'>('products');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isSettlementModalVisible, setIsSettlementModalVisible] = useState(false);
 
   const baseUrl = getApiBaseUrl();
 
@@ -105,8 +107,17 @@ export default function TabDetailScreen() {
   }, []);
 
   const handleSettleTab = useCallback(() => {
-    // Settle tab action hook (used in subsequent checkout & settlement phases)
+    setIsSettlementModalVisible(true);
   }, []);
+
+  const handleSettlementSuccess = useCallback(
+    (_settledOrder: any) => {
+      clearActiveOrder();
+      setIsSettlementModalVisible(false);
+      router.push('/(sales)');
+    },
+    [clearActiveOrder, router]
+  );
 
   const isWide = width >= 768;
 
@@ -267,6 +278,24 @@ export default function TabDetailScreen() {
             />
           </View>
         </View>
+      )}
+
+      {order && (
+        <SettlementModal
+          visible={isSettlementModalVisible}
+          onClose={() => setIsSettlementModalVisible(false)}
+          orderId={order.id}
+          orderName={order.order_name || undefined}
+          totalAmount={
+            totalPrice ||
+            (typeof order.total_amount === 'string'
+              ? parseFloat(order.total_amount)
+              : Number(order.total_amount)) ||
+            0
+          }
+          apiBaseUrl={baseUrl}
+          onSettlementSuccess={handleSettlementSuccess}
+        />
       )}
     </SafeAreaView>
   );

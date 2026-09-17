@@ -141,6 +141,62 @@ describe('TabDetailScreen', () => {
     });
   });
 
+  it('opens settlement modal on Settle Tab press and settles order successfully', async () => {
+    const mockSettledOrder = {
+      id: 'tab-order-1',
+      order_name: 'Table 4',
+      status: 'closed',
+      payment_method: 'cash',
+      total_amount: 2000,
+    };
+
+    render(<TabDetailScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Table 4')).toBeTruthy();
+    });
+
+    const cartTab = screen.getByRole('tab', { name: /cart/i });
+    fireEvent.press(cartTab);
+
+    const settleBtn = screen.getByTestId('settle-tab-button');
+    fireEvent.press(settleBtn);
+
+    // Settlement modal is visible
+    await waitFor(() => {
+      expect(screen.getByText('Settle Order')).toBeTruthy();
+      expect(screen.getByTestId('confirm-settlement-button')).toBeTruthy();
+    });
+
+    (global.fetch as jest.Mock).mockImplementationOnce(async (url: string) => {
+      if (url.includes('/api/orders/tab-order-1/settle')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => mockSettledOrder,
+        };
+      }
+      return { ok: true, status: 200, json: async () => ({}) };
+    });
+
+    const confirmBtn = screen.getByTestId('confirm-settlement-button');
+    fireEvent.press(confirmBtn);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/orders/tab-order-1/settle'),
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ payment_method: 'cash' }),
+        })
+      );
+      // Clears active order and navigates to /(sales)
+      expect(useCartStore.getState().activeOrderId).toBeNull();
+      expect(mockPush).toHaveBeenCalledWith('/(sales)');
+    });
+  });
+
   it('clears active order on unmount', async () => {
     const { unmount } = render(<TabDetailScreen />);
 
