@@ -2,105 +2,116 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Elevate the entire Kwata POS application to consumer-grade quality by applying the six Impeccable UX principles (Distill, Adapt, Animate, Layout, Typeset, and Polish) **globally**. This goes beyond the Open Orders screen to unify the Admin, Manager, and Sales routes under a single, highly refined design system.
+**Goal:** Elevate the entire Kwata POS application to consumer-grade quality by applying the six Impeccable UX principles (Distill, Adapt, Animate, Layout, Typeset, and Polish) **globally**. This specifically addresses bad mobile UX patterns, moving the app toward mature, industry-standard mobile interfaces.
 
-**Architecture/Tech Stack:** React Native (Expo Router), React Native Reanimated (for Toasts/Transitions), centralized theme tokens.
+**Architecture/Tech Stack:** React Native (Expo Router), React Native Reanimated, centralized theme tokens.
 
 ## Visible Tangible Outcomes
-1. **Global Design Tokens:** All hardcoded hex colors and font sizes are replaced by a unified `theme.ts` token system.
-2. **Global Layout & Distill (Header):** A universal `ProfileDropdown` component cleans up the headers across all routes. Destructive actions like "Log Out" and secondary navigation are hidden behind the avatar, leaving only one primary action per screen.
-3. **Global Adapt (Mobile FABs):** Primary creation actions (`+ New Tab`, `+ Add Product`, `+ Invite Staff`, `+ Draft Requisition`) automatically adapt to Floating Action Buttons (FABs) anchored to the bottom right on mobile devices, ensuring thumb reachability.
-4. **Global Quieter & Animate (Toasts):** A global `ToastProvider` replaces all inline static success/error banners with elegant, animated, auto-dismissing notifications using tinted neutrals instead of fully saturated red/green.
-5. **Accessible Typography:** A strict typography floor is enforced app-wide. No metadata or badge text falls below `13px` with proper tracking.
+1. **Stats-Driven Admin Dashboard:** The admin home screen transforms from a primitive stack of huge buttons into a mature, stats-driven dashboard (Sales, Stock, Orders) with a refined navigation grid.
+2. **WhatsApp-Style Minimal Lists:** Bulky cards with inline buttons are completely removed. Lists (Team, Catalog, Orders) become minimal, scannable rows (like WhatsApp contacts) featuring an avatar/icon on the left and a chevron on the right.
+3. **Item Detail Pages (Distill):** Tapping a list row navigates to a dedicated Item Detail page. Destructive and secondary actions (`Edit`, `Delete`) are moved here, keeping the primary lists clean and distraction-free.
+4. **Icon-Driven Top Actions:** The bulky `+ Add [Item]` text buttons are replaced by simple, icon-driven actions (e.g., a `+` icon) anchored in the top header.
+5. **Contextual Add Forms:** Adding items uses contextual UI based on complexity: Bottom Sheets for simple, small forms, and dedicated pages with a `< Back` button for larger, complex forms.
+6. **Global Quieter Toasts:** A global `ToastProvider` replaces all inline static success/error banners with elegant, animated, auto-dismissing notifications.
+7. **Accessible Typography:** A strict typography floor is enforced app-wide (minimum `13px` for badges).
 
 ---
 
 ## User Acceptance Testing (UAT) Contract
 
-### 1. Global Distill & Adapt UAT
-- **Action:** Open the `Team`, `Catalog`, and `Open Orders` screens on an iPhone simulator.
-- **Expected Outcome:** The top header is clean (just Title and Profile Avatar). At the bottom right of the screen, a clear `+` FAB exists for adding a User, Product, or Tab respectively.
-- **Evidence Required:** Three screenshots showing the FAB on Team, Catalog, and Sales routes.
+### 1. Admin Dashboard UAT
+- **Action:** Log in as an Admin.
+- **Expected Outcome:** The home screen displays top-level stats (e.g., "Today's Sales", "Low Stock"). Below the stats is a mature, elegantly laid-out navigation grid or menu (Team, Catalog, Reports), not a single centered card of stacked black buttons.
 
-### 2. Global Quieter & Typeset UAT
-- **Action:** Inspect the badges on the Catalog (Stock levels) and Team (Roles) screens. Trigger a failed login or failed form submission.
-- **Expected Outcome:** Badges are readable (minimum `13px`). The error toast that appears uses a soft `#FDE8E8` background with dark red text, not a glaring solid `#FF3B30`. Disabled buttons have dark gray text, not invisible white text.
-- **Evidence Required:** Screenshot of the Catalog badges and the triggered Error Toast.
+### 2. WhatsApp-Style Lists & Detail Pages UAT
+- **Action:** Navigate to the Catalog or Team list. Tap an item.
+- **Expected Outcome:** The list uses minimal, dense rows without inline `Edit`/`Delete` buttons. Tapping a row opens a new screen (Detail Page) where full details, `Edit`, and `Delete` actions live.
 
-### 3. Global Animate UAT
-- **Action:** Settle an open tab OR delete a product from the Catalog.
-- **Expected Outcome:** The card/list item scales down and fades out smoothly (`150ms`) before the layout reflows. The success Toast slides down from the top and dismisses automatically.
-- **Evidence Required:** Screen recording (`.mov` or `.gif`) of an item being deleted/settled with the exit animation and Toast.
+### 3. Add Component Context UAT
+- **Action:** Tap the `+` icon in the header to add a complex item (like a Product).
+- **Expected Outcome:** It navigates to a full screen with a back button. 
+
+### 4. Global Toasts UAT
+- **Action:** Delete an item from its detail page.
+- **Expected Outcome:** The app navigates back to the list. A soft, tinted success toast slides down from the top and auto-dismisses after 3 seconds.
 
 ---
 
-### Task 1: Polish & Typeset (Global Design Tokens & Typography)
+### Task 1: Admin Dashboard (Stats-Driven & Mature)
+
+**Files:**
+- Modify: `frontend/src/app/(admin)/index.tsx`
+
+- [ ] **Step 1: Destroy the Stacked Buttons Card**
+Remove the centered `card` layout containing the giant `Team`, `Catalog`, `Customers`, `Daily Report`, and `Log Out` buttons.
+- [ ] **Step 2: Build the Stats Header**
+Implement a horizontal scroll or grid of 2-3 stat cards at the top (e.g., "Today's Sales", "Active Orders", "Low Stock Alerts"). Use placeholder data if the backend isn't ready.
+- [ ] **Step 3: Mature Navigation Grid**
+Below the stats, implement a mature, icon-driven grid menu (or a sleek list) for the main navigation items (`Team`, `Catalog`, `Customers`, `Reports`).
+- [ ] **Step 4: Commit**
+`git commit -m "feat: redesign admin dashboard to be stats-driven with mature navigation layout"`
+
+---
+
+### Task 2: Distill Lists (WhatsApp-Style Rows) & Header Actions
+
+**Files:**
+- Modify: `frontend/src/app/(admin)/catalog.tsx`, `frontend/src/app/(admin)/team.tsx`, `frontend/src/app/(sales)/index.tsx`
+
+- [ ] **Step 1: Icon-Driven Header Actions**
+In the header of these list screens, replace bulky text buttons (e.g., `+ Add Product`) with a simple, icon-only button (e.g., a `+` SVG icon) aligned to the top right.
+- [ ] **Step 2: Strip Inline Actions from Lists**
+Remove the `Edit` and `Delete` buttons entirely from the list items in Catalog, Team, etc.
+- [ ] **Step 3: Implement WhatsApp-Style Rows**
+Redesign the list items to be minimal rows. Left side: Avatar or Icon. Middle: Title (bold, 16px) and Subtitle (gray, 13px/14px). Right side: Contextual metadata (e.g., Price or Stock) and a small `>` chevron indicating it is tappable.
+- [ ] **Step 4: Commit**
+`git commit -m "feat: refactor lists to minimal rows and use icon-driven header actions"`
+
+---
+
+### Task 3: Item Detail Pages & Contextual Add Forms
+
+**Files:**
+- Create/Modify: `frontend/src/app/(admin)/product/[id].tsx`, `user/[id].tsx`, etc.
+- Create/Modify: Add forms.
+
+- [ ] **Step 1: Create Item Detail Pages**
+When a user taps a minimal list row, use Expo Router to push them to a detail screen (e.g., `router.push('/(admin)/product/123')`). 
+- [ ] **Step 2: Move Actions to Detail Pages**
+On the Item Detail page, display all expanded data. Place the `Edit` and `Delete` actions here (e.g., `Edit` in the header or as a prominent secondary button, `Delete` as a destructive button at the bottom).
+- [ ] **Step 3: Standardize Add Forms**
+For complex forms (e.g., Add Product), ensure tapping the header `+` icon navigates to a dedicated page (e.g., `/(admin)/product/new`) with a back button. For trivial additions (if any), use a Bottom Sheet (`@gorhom/bottom-sheet` or a custom modal anchored to the bottom).
+- [ ] **Step 4: Commit**
+`git commit -m "feat: implement item detail pages and standardize complex form routing"`
+
+---
+
+### Task 4: Polish & Typeset (Global Tokens & Typography)
 
 **Files:**
 - Create: `frontend/src/core/theme/tokens.ts`
-- Modify: Search and replace across `frontend/src/app/**/*.tsx` and `frontend/src/features/**/*.tsx`
+- Modify: Search and replace across `frontend/src/app/**/*.tsx`
 
 - [ ] **Step 1: Extract Tokens**
-Create a `tokens.ts` file containing a semantic color palette (e.g., `colors.background.primary`, `colors.surface.card`, `colors.status.errorBg`) and a typography scale (`typography.sizes.sm = 13`, `typography.sizes.body = 16`).
+Create `tokens.ts` with semantic colors (`colors.background.primary`, `colors.status.errorBg`) and a typography scale.
 - [ ] **Step 2: Refactor Hardcoded Values**
-Replace all hardcoded `#F2F2F7`, `#FFFFFF`, `#111111`, etc., across the entire app with the new token system.
+Replace all hardcoded `#F2F2F7`, `#FFFFFF`, `#111111` across the app with the new tokens.
 - [ ] **Step 3: Enforce Typography Floor**
-Audit all text elements. Bump any `fontSize` of 10, 11, or 12px to a minimum of `13px`. Ensure buttons use `16px`.
-- [ ] **Step 4: Fix Disabled Button Contrast**
-Ensure all buttons across the app use dark gray text (`#8E8E93`) when disabled on a light gray background, rather than leaving the text white.
-- [ ] **Step 5: Commit**
-`git commit -m "refactor: implement global design tokens and enforce accessibility typography floor"`
-
----
-
-### Task 2: Distill & Layout (Global Header Simplification)
-
-**Files:**
-- Create: `frontend/src/core/components/ProfileDropdown.tsx`
-- Modify: `frontend/src/app/_layout.tsx` or individual screen headers (`(sales)/index.tsx`, `(admin)/*.tsx`)
-
-- [ ] **Step 1: Build the ProfileDropdown**
-Create a reusable component (using a Modal or Popover) that displays the user's avatar/email. When tapped, it reveals secondary actions (e.g., "Expenses", "Settings") and the "Log Out" button.
-- [ ] **Step 2: Clean the Headers**
-Remove inline "Log Out" and "Expenses" buttons from all screen headers across the `(sales)`, `(manager)`, and `(admin)` routes. Replace them with the `ProfileDropdown`.
-- [ ] **Step 3: Commit**
-`git commit -m "feat: distill global headers using a unified Profile Dropdown"`
-
----
-
-### Task 3: Adapt (App-Wide Mobile FAB & Fluid Grids)
-
-**Files:**
-- Create: `frontend/src/core/components/ResponsiveFAB.tsx`
-- Modify: `frontend/src/app/(sales)/index.tsx`
-- Modify: `frontend/src/app/(admin)/catalog.tsx`
-- Modify: `frontend/src/app/(admin)/team.tsx`
-
-- [ ] **Step 1: Build the Responsive FAB**
-Create a wrapper component that uses `useWindowDimensions()`. If `width >= 768`, it renders as a standard inline button (for the header). If `width < 768`, it renders as an absolute positioned Floating Action Button in the bottom right corner.
-- [ ] **Step 2: Apply to Primary Actions**
-Replace the hardcoded `+ New Tab`, `+ Add Product`, and `+ Invite Staff` buttons across the app with the `ResponsiveFAB`.
-- [ ] **Step 3: Fluid Grid Layouts**
-Audit the app for fragile percentage widths (e.g., `width: '31.5%'`). Refactor them to use `flexWrap: 'wrap'` with `flexGrow: 1` and `minWidth` so grids flow naturally on any screen size.
+Audit all text elements. Bump any `fontSize` of 10, 11, or 12px to a minimum of `13px`.
 - [ ] **Step 4: Commit**
-`git commit -m "feat: implement responsive mobile FABs and fluid grid layouts globally"`
+`git commit -m "refactor: apply global design tokens and typography accessibility floor"`
 
 ---
 
-### Task 4: Quieter & Animate (Global Toast Provider & Exit Animations)
+### Task 5: Quieter & Animate (Global Toast Provider)
 
 **Files:**
 - Create: `frontend/src/core/providers/ToastProvider.tsx`
 - Modify: `frontend/src/app/_layout.tsx`
-- Modify: Grid items in `(sales)/index.tsx`, `(admin)/catalog.tsx`
 
 - [ ] **Step 1: Build the Animated Toast Provider**
-Create a global context provider that can be called via `useToast()`. It should render a transient, animated toast at the top of the screen that auto-dismisses after 3 seconds. 
+Create a global context provider that renders a transient, animated toast at the top of the screen that auto-dismisses after 3 seconds. 
 - [ ] **Step 2: Apply Quieter Colors**
 Ensure the Toast uses tinted neutrals: `#FDE8E8` for errors, `#E8F8EE` for success. Remove all inline, manually dismissed banners across the app.
-- [ ] **Step 3: Item Exit Animations**
-Wrap order cards and catalog list items in `Animated.View` (from `react-native-reanimated` or core). When an item is deleted or settled, trigger a `150ms` animation (scale to `0.9`, opacity to `0`) before removing it from the state array.
-- [ ] **Step 4: Capture UAT**
-Run simulators for iPhone and iPad. Record a deletion/settlement animation and capture the Toast.
-- [ ] **Step 5: Commit**
-`git commit -m "feat: add global animated toast provider and item exit transitions"`
+- [ ] **Step 3: Commit**
+`git commit -m "feat: add global animated toast provider for quieter success/error alerts"`
