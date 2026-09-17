@@ -125,7 +125,10 @@ export default function RequisitionsScreen({ apiBaseUrl }: RequisitionsScreenPro
       });
       const data = await res.json().catch(() => ({}));
       const effectiveToken = data.token || req.token;
-      const vendorUrl = `http://127.0.0.1:3011/public/vendor/${effectiveToken}`;
+      const vendorUrl =
+        typeof data.share_url === 'string' && data.share_url.length > 0
+          ? data.share_url
+          : `http://127.0.0.1:3011/public/vendor/${effectiveToken}`;
 
       if (Platform.OS === 'web') {
         if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
@@ -403,7 +406,7 @@ export default function RequisitionsScreen({ apiBaseUrl }: RequisitionsScreenPro
 
                 {/* Status-specific Action Button */}
                 <View style={styles.cardActionsRow}>
-                  {req.status === 'draft' && (
+                  {(req.status === 'draft' || req.status === 'sent') && (
                     <TouchableOpacity
                       style={styles.actionButtonPrimary}
                       onPress={() => handleShare(req)}
@@ -411,7 +414,9 @@ export default function RequisitionsScreen({ apiBaseUrl }: RequisitionsScreenPro
                       accessibilityLabel="Share to Vendor"
                       testID="share-requisition-btn"
                     >
-                      <Text style={styles.actionButtonPrimaryText}>Share to Vendor</Text>
+                      <Text style={styles.actionButtonPrimaryText}>
+                        {req.status === 'sent' ? 'Resend to Vendor' : 'Share to Vendor'}
+                      </Text>
                     </TouchableOpacity>
                   )}
 

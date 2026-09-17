@@ -20,6 +20,11 @@ export interface Product {
   category?: string;
 }
 
+export interface LastPurchasePrice {
+  product_id: string;
+  last_purchase_price: number | string;
+}
+
 export interface DraftItem {
   product_id: string;
   product_name: string;
@@ -44,6 +49,7 @@ export function RequisitionDraftModal({
 
   const [title, setTitle] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
+  const [lastPrices, setLastPrices] = useState<Record<string, number>>({});
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [productError, setProductError] = useState<string | null>(null);
 
@@ -76,6 +82,30 @@ export function RequisitionDraftModal({
           }))
         : [];
       setProducts(normalized);
+
+      try {
+        const pricesRes = await fetch(`${baseUrl}/api/requisitions/last-prices`);
+        if (pricesRes.ok) {
+          const pricesData: LastPurchasePrice[] = await pricesRes.json();
+          const map: Record<string, number> = {};
+          if (Array.isArray(pricesData)) {
+            pricesData.forEach((entry) => {
+              const value =
+                typeof entry.last_purchase_price === 'number'
+                  ? entry.last_purchase_price
+                  : parseFloat(String(entry.last_purchase_price));
+              if (!isNaN(value)) {
+                map[entry.product_id] = value;
+              }
+            });
+          }
+          setLastPrices(map);
+        } else {
+          setLastPrices({});
+        }
+      } catch {
+        setLastPrices({});
+      }
     } catch (err: any) {
       setProductError(err?.message || 'Failed to load products');
     } finally {
@@ -83,9 +113,16 @@ export function RequisitionDraftModal({
     }
   };
 
+  const resolveUnitPrice = (prod: Product) => {
+    if (lastPrices[prod.id] !== undefined) {
+      return lastPrices[prod.id];
+    }
+    return typeof prod.price === 'number' ? prod.price : parseFloat(String(prod.price)) || 0;
+  };
+
   const handleAddProduct = (prod: Product) => {
     const existingIndex = selectedItems.findIndex((i) => i.product_id === prod.id);
-    const unitPrice = typeof prod.price === 'number' ? prod.price : parseFloat(prod.price) || 0;
+    const unitPrice = resolveUnitPrice(prod);
 
     if (existingIndex >= 0) {
       const updated = [...selectedItems];
@@ -327,8 +364,10 @@ export function RequisitionDraftModal({
               <View style={styles.catalogGrid}>
                 {products.map((prod) => {
                   const isSelected = selectedItems.some((i) => i.product_id === prod.id);
-                  const numPrice =
-                    typeof prod.price === 'number' ? prod.price : parseFloat(prod.price) || 0;
+                  const catalogPrice =
+                    typeof prod.price === 'number' ? prod.price : parseFloat(String(prod.price)) || 0;
+                  const lastPrice = lastPrices[prod.id];
+                  const displayPrice = lastPrice !== undefined ? lastPrice : catalogPrice;
 
                   return (
                     <TouchableOpacity
@@ -343,7 +382,14 @@ export function RequisitionDraftModal({
                         {prod.name}
                       </Text>
                       <View style={styles.catalogBottomRow}>
-                        <Text style={styles.catalogPrice}>{numPrice.toLocaleString()} FCFA</Text>
+                        <View>
+                          <Text style={styles.catalogPrice}>
+                            {displayPrice.toLocaleString()} FCFA
+                          </Text>
+                          <Text style={styles.catalogPriceHint}>
+                            {lastPrice !== undefined ? 'Last purchase' : 'Catalog price'}
+                          </Text>
+                        </View>
                         <View style={[styles.addBadge, isSelected && styles.addBadgeSelected]}>
                           <Text style={[styles.addBadgeText, isSelected && styles.addBadgeTextSelected]}>
                             {isSelected ? 'Added' : '+ Add'}
@@ -612,6 +658,11 @@ const styles = StyleSheet.create({
   catalogPrice: {
     fontSize: 13,
     color: '#8E8E93',
+  },
+  catalogPriceHint: {
+    fontSize: 11,
+    color: '#8E8E93',
+    marginTop: 2,
   },
   addBadge: {
     backgroundColor: '#F2F2F7',

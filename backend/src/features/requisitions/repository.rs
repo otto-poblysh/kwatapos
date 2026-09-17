@@ -45,6 +45,12 @@ pub struct RequisitionWithItems {
     pub items: Vec<RequisitionItemDetail>,
 }
 
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize, PartialEq)]
+pub struct LastPurchasePrice {
+    pub product_id: Uuid,
+    pub last_purchase_price: Decimal,
+}
+
 pub async fn create_requisition_tx(
     tx: &mut Transaction<'_, Postgres>,
     title: &str,
@@ -268,6 +274,22 @@ pub async fn get_requisition_summaries(
          LEFT JOIN requisition_items ri ON ri.requisition_id = r.id \
          GROUP BY r.id \
          ORDER BY r.created_at DESC",
+    )
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn get_last_purchase_prices(
+    pool: &PgPool,
+) -> Result<Vec<LastPurchasePrice>, sqlx::Error> {
+    sqlx::query_as::<_, LastPurchasePrice>(
+        "SELECT DISTINCT ON (ri.product_id) \
+             ri.product_id, \
+             COALESCE(ri.confirmed_price, ri.expected_price) AS last_purchase_price \
+         FROM requisition_items ri \
+         INNER JOIN requisitions r ON r.id = ri.requisition_id \
+         WHERE r.status IN ('accepted', 'partial_delivery', 'delivered', 'paid') \
+         ORDER BY ri.product_id, r.updated_at DESC",
     )
     .fetch_all(pool)
     .await

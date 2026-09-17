@@ -189,7 +189,7 @@ pub async fn share_requisition(
     tx.commit().await.map_err(RequisitionError::Database)?;
 
     let base_url = std::env::var("FRONTEND_URL")
-        .unwrap_or_else(|_| "http://localhost:3011".to_string());
+        .unwrap_or_else(|_| "http://127.0.0.1:3011".to_string());
     let share_url = format!("{}/public/vendor/{}", base_url.trim_end_matches('/'), updated.token);
 
     Ok(ShareRequisitionResponse {
@@ -461,4 +461,20 @@ pub async fn confirm_public_requisition(
         created_at: updated_req.created_at,
         updated_at: updated_req.updated_at,
     })
+}
+
+pub async fn get_last_purchase_prices(
+    pool: &PgPool,
+) -> Result<Vec<repository::LastPurchasePrice>, RequisitionError> {
+    let prices = repository::get_last_purchase_prices(pool)
+        .await
+        .map_err(RequisitionError::Database)?;
+
+    Ok(prices
+        .into_iter()
+        .map(|p| repository::LastPurchasePrice {
+            product_id: p.product_id,
+            last_purchase_price: rescale_2(p.last_purchase_price),
+        })
+        .collect())
 }

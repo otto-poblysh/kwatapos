@@ -212,11 +212,12 @@ describe('Requisitions Screen', () => {
     expect(screen.getByText(/Qty: 20 • Expected: 1,000 FCFA/i)).toBeTruthy();
   });
 
-  it('opens draft modal and submits a new requisition', async () => {
+    it('opens draft modal and submits a new requisition', async () => {
     // 1st fetch: list requisitions
     // 2nd fetch: get products in draft modal
-    // 3rd fetch: create requisition POST
-    // 4th fetch: refresh list
+    // 3rd fetch: last purchase prices
+    // 4th fetch: create requisition POST
+    // 5th fetch: refresh list
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce({
         ok: true,
@@ -225,6 +226,10 @@ describe('Requisitions Screen', () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => mockProducts,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [],
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -263,6 +268,7 @@ describe('Requisitions Screen', () => {
     // Add a product
     await waitFor(() => {
       expect(screen.getByTestId('product-select-prod-1')).toBeTruthy();
+      expect(screen.getAllByText('Catalog price').length).toBeGreaterThan(0);
     });
     fireEvent.press(screen.getByTestId('product-select-prod-1'));
 
@@ -285,6 +291,69 @@ describe('Requisitions Screen', () => {
                 product_id: 'prod-1',
                 quantity: 1,
                 expected_price: 1000,
+              },
+            ],
+          }),
+        })
+      );
+    });
+  });
+
+  it('auto-fills expected price from last purchase price', async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [],
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockProducts,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          { product_id: 'prod-1', last_purchase_price: '800.00' },
+        ],
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: 'req-new', title: 'Restock Batch', status: 'draft' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [],
+      });
+
+    render(<RequisitionsScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('draft-first-requisition-btn')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId('draft-first-requisition-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Last purchase')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByTestId('product-select-prod-1'));
+
+    expect(screen.getByTestId('draft-estimated-total')).toHaveTextContent('800 FCFA');
+
+    fireEvent.press(screen.getByTestId('create-requisition-btn'));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/requisitions'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            title: 'New Requisition',
+            items: [
+              {
+                product_id: 'prod-1',
+                quantity: 1,
+                expected_price: 800,
               },
             ],
           }),

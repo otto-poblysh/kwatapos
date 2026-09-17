@@ -1466,4 +1466,121 @@ async fn test_cumulative_delivery_and_status_regression_guards() {
     assert_eq!(req_db_acc.status, "accepted");
 }
 
+#[tokio::test]
+async fn test_api_last_purchase_prices() {
+    let (app, pool) = test_app_and_pool().await;
+
+    let product_name = format!("Last Price Product {}", &Uuid::new_v4().simple().to_string()[..6]);
+    let product = create_product(&pool, &product_name, Decimal::new(1000, 2), "Beverages")
+        .await
+        .unwrap();
+
+    let res_empty = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/requisitions/last-prices")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_empty.status(), StatusCode::OK);
+
+    let res_create = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/requisitions")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "title": "Last Price Requisition",
+                    "items": [{ "product_id": product.id, "quantity": 8, "expected_price": "900.00" }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_create.status(), StatusCode::CREATED);
+    let created: Value = serde_json::from_slice(
+        &res_create.into_body().collect().await.unwrap().to_bytes(),
+    )
+    .unwrap();
+    let req_id = created["id"].as_str().unwrap();
+    let token = created["token"].as_str().unwrap();
+    let item_id = created["items"][0]["id"].as_str().unwrap();
+
+    // Draft requisitions must not contribute last purchase prices
+    let res_draft_prices = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/requisitions/last-prices")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let draft_prices: Vec<Value> = serde_json::from_slice(
+        &res_draft_prices.into_body().collect().await.unwrap().to_bytes(),
+    )
+    .unwrap();
+    assert!(
+        !draft_prices.iter().any(|p| p["product_id"] == product.id.to_string()),
+        "Draft requisitions should not appear in last purchase prices"
+    );
+
+    let share_res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/share", req_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(share_res.status(), StatusCode::OK);
+
+    let confirm_res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/public/requisition/{}", token))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [{ "item_id": item_id, "confirmed_price": "875.00" }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(confirm_res.status(), StatusCode::OK);
+
+    let res_prices = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/requisitions/last-prices")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_prices.status(), StatusCode::OK);
+    let prices: Vec<Value> =
+        serde_json::from_slice(&res_prices.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    let matched = prices
+        .iter()
+        .find(|p| p["product_id"] == product.id.to_string())
+        .expect("Accepted requisition should contribute last purchase price");
+    assert_eq!(matched["last_purchase_price"], "875.00");
+}
+
 

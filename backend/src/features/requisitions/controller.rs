@@ -18,6 +18,7 @@ use super::{
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", get(list_requisitions_handler).post(create_requisition_handler))
+        .route("/last-prices", get(last_prices_handler))
         .route("/{id}", get(get_requisition_handler))
         .route("/{id}/share", post(share_requisition_handler))
         .route("/{id}/deliver", post(deliver_requisition_handler))
@@ -71,6 +72,24 @@ pub async fn create_requisition_handler(
 
     match service::create_requisition(pool, payload).await {
         Ok(res) => (StatusCode::CREATED, Json(res)).into_response(),
+        Err(e) => requisition_error_response(e),
+    }
+}
+
+pub async fn last_prices_handler(State(state): State<AppState>) -> Response {
+    let pool = match &state.pool {
+        Some(p) => p,
+        None => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Database unconfigured" })),
+            )
+                .into_response();
+        }
+    };
+
+    match service::get_last_purchase_prices(pool).await {
+        Ok(res) => (StatusCode::OK, Json(res)).into_response(),
         Err(e) => requisition_error_response(e),
     }
 }

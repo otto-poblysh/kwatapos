@@ -42,7 +42,7 @@
 
 *Applying UX principles from `impeccable/reference/onboard.md`.*
 
-- [ ] **Step 1: Requisitions Empty State**
+- [x] **Step 1: Requisitions Empty State**
 In `frontend/src/app/(manager)/requisitions.tsx`, do not just show "No Requisitions".
 Design an empty state with:
 - **What will be here**: "Your vendor orders will appear here."
@@ -56,13 +56,13 @@ Design an empty state with:
 **Files:**
 - Create: `backend/migrations/0008_create_requisitions_and_expenses.sql`
 
-- [ ] **Step 1: Write Migration Files**
+- [x] **Step 1: Write Migration Files**
 `requisitions`: id, token (uuid for public link), status (draft, sent, accepted, partial_delivery, delivered, paid).
 `requisition_items`: id, requisition_id, product_id, quantity, expected_price, confirmed_price, received_quantity.
 `direct_expenses`: id, requested_by, category, amount, status (requested, approved, receipt_uploaded), receipt_image_url.
-- [ ] **Step 2: Run Migrations**
+- [x] **Step 2: Run Migrations**
 Run `sqlx migrate run`.
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 `git commit -m "feat: setup requisitions and direct expenses database schema"`
 
 ---
@@ -73,13 +73,13 @@ Run `sqlx migrate run`.
 - Create: `backend/src/features/requisitions/mod.rs` (Service, Controller)
 - Create: `backend/src/features/expenses/mod.rs`
 
-- [ ] **Step 1: RED - Write the failing tests**
+- [x] **Step 1: RED - Write the failing tests**
 Write tests for creating a requisition, a public vendor endpoint that accepts price changes via `token`, and marking an expense as receipt uploaded.
-- [ ] **Step 2: GREEN - Implement Internal APIs**
+- [x] **Step 2: GREEN - Implement Internal APIs**
 Implement endpoints for Managers to create drafts, finalize to "sent", mark as "delivered" (with actual received quantities impacting `inventory`), and mark "paid".
-- [ ] **Step 3: GREEN - Implement Public Vendor API**
+- [x] **Step 3: GREEN - Implement Public Vendor API**
 Implement `GET /api/public/requisition/:token` (returns items) and `POST /api/public/requisition/:token` (updates prices, sets status to 'accepted').
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 `git commit -m "feat: implement requisitions, expenses, and public vendor APIs"`
 
 ---
@@ -91,15 +91,15 @@ Implement `GET /api/public/requisition/:token` (returns items) and `POST /api/pu
 - Create: `frontend/src/features/requisitions/components/RequisitionDraft.tsx`
 - Create: `frontend/src/app/public/vendor/[token].tsx`
 
-- [ ] **Step 1: Install Native Sharing**
+- [x] **Step 1: Install Native Sharing**
 Run `npx expo install expo-sharing expo-file-system`.
-- [ ] **Step 2: Build the Draft View**
+- [x] **Step 2: Build the Draft View**
 Allow Managers to select products and quantities. Auto-fill the `expected_price` using the last known price from the database.
-- [ ] **Step 3: Implement Native Sharing**
+- [x] **Step 3: Implement Native Sharing**
 When "Share Order" is pressed, generate the public link (`https://[your-domain]/public/vendor/[token]`). Use `Sharing.shareAsync()` so the manager can send it via WhatsApp/iMessage.
-- [ ] **Step 4: Build the Vendor Public Form**
+- [x] **Step 4: Build the Vendor Public Form**
 Create `public/vendor/[token].tsx`. This route must work on Expo Web without authentication. Display a clean, mobile-friendly HTML form for the vendor to review quantities and edit prices.
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git commit -m "feat: implement native sharing and public vendor web form"`
 
 ---
@@ -109,13 +109,13 @@ Create `public/vendor/[token].tsx`. This route must work on Expo Web without aut
 **Files:**
 - Create: `frontend/src/features/expenses/components/ExpenseRequest.tsx`
 
-- [ ] **Step 1: Install Image Picker**
+- [x] **Step 1: Install Image Picker**
 Run `npx expo install expo-image-picker`.
-- [ ] **Step 2: Build Expense Request Form**
+- [x] **Step 2: Build Expense Request Form**
 Create a form with preset categories (Cigarettes, Fish, Supplies).
-- [ ] **Step 3: Implement Receipt Upload**
+- [x] **Step 3: Implement Receipt Upload**
 Add an "Upload Receipt" button on approved expenses that triggers `ImagePicker.launchCameraAsync()`. Convert the image to base64 or multipart form data to submit to the backend.
-- [ ] **Step 4: Capture UAT Screenshots**
+- [x] **Step 4: Capture UAT Screenshots**
 Run the simulator. Capture the Requisition Empty State, the Vendor Web Form, and the Receipt Upload screen.
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 `git commit -m "feat: implement direct expenses and camera receipt uploads"`
