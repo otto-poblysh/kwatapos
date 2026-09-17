@@ -34,7 +34,7 @@
 
 *Note: Phase 6 implementation was excellent. The "Expected Cash in Drawer" calculation and the dark/accent card styling perfectly respected the `DESIGN.md` guidelines. No cleanup is required.*
 
-- [ ] **Step 1: Verify Phase 6 Baseline**
+- [x] **Step 1: Verify Phase 6 Baseline**
 Ensure `cargo test` and `npm run test` still pass before beginning Phase 7.
 
 ---
@@ -44,14 +44,14 @@ Ensure `cargo test` and `npm run test` still pass before beginning Phase 7.
 **Files:**
 - Create: `backend/migrations/0010_add_performance_indexes.sql`
 
-- [ ] **Step 1: Write Migration Files**
+- [x] **Step 1: Write Migration Files**
 Identify lookup bottlenecks. Add indexes for:
   - `orders(status)` and `orders(created_at)` for the daily reconciliation query.
   - `customers(phone_number)` for faster customer login.
   - `requisitions(token)` for the public vendor route.
-- [ ] **Step 2: Run Migrations**
+- [x] **Step 2: Run Migrations**
 Run `sqlx migrate run`.
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 `git commit -m "chore: add database performance indexes"`
 
 ---
@@ -62,11 +62,11 @@ Run `sqlx migrate run`.
 - Modify: `backend/src/features/reports/service.rs` (or relevant controllers)
 - Modify: `backend/src/features/requisitions/service.rs`
 
-- [ ] **Step 1: Audit for N+1 Queries**
+- [x] **Step 1: Audit for N+1 Queries**
 Review endpoints that fetch relationships (e.g., fetching a requisition and its items). Ensure `JOIN`s or batch fetches are used instead of looping over records and making a query for each.
-- [ ] **Step 2: Test Assertions**
+- [x] **Step 2: Test Assertions**
 Run the test suite to ensure no business logic was broken during the query refactoring.
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 `git commit -m "perf: optimize backend queries and resolve N+1 issues"`
 
 ---
@@ -77,13 +77,13 @@ Run the test suite to ensure no business logic was broken during the query refac
 - Modify: `frontend/src/app/**` (as needed)
 - Modify: `frontend/src/features/**/components/**` (as needed)
 
-- [ ] **Step 1: Global Shadow Purge**
+- [x] **Step 1: Global Shadow Purge**
 Search the frontend codebase for `shadowColor`, `shadowOffset`, `elevation`. Remove them entirely. Kwata POS is strictly flat.
-- [ ] **Step 2: Typography & Rounding Check**
+- [x] **Step 2: Typography & Rounding Check**
 Ensure all interactive cards use `borderRadius: 24` or `16`. Ensure all primary action buttons use `borderRadius: 9999` (pill shape).
-- [ ] **Step 3: Capture UAT Screenshots**
+- [x] **Step 3: Capture UAT Screenshots**
 Take screenshots of the refined UI using the simulator.
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 `git commit -m "style: finalize design parity with DESIGN.md"`
 
 ---
@@ -94,9 +94,9 @@ Take screenshots of the refined UI using the simulator.
 - Create/Modify: `frontend/eas.json`
 - Modify: `frontend/app.json`
 
-- [ ] **Step 1: Initialize EAS**
+- [x] **Step 1: Initialize EAS**
 Run `npx eas-cli build:configure` in the `frontend` directory (if not already installed, use `npm install -g eas-cli`).
-- [ ] **Step 2: Configure Profiles**
+- [x] **Step 2: Configure Profiles**
 Set up a `preview` profile (for simulator builds) and a `production` profile in `eas.json`. Ensure the `app.json` bundle identifiers (e.g., `com.kwata.pos`) are correctly defined.
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 `git commit -m "chore: configure EAS build for native iOS and Android artifacts"`
