@@ -38,6 +38,16 @@ export default function ManagerDashboard() {
           </TouchableOpacity>
 
           <TouchableOpacity
+            style={styles.manageExpensesButton}
+            onPress={() => router.push('/(manager)/expenses')}
+            accessibilityRole="button"
+            accessibilityLabel="Direct Expenses"
+            testID="manage-expenses-btn"
+          >
+            <Text style={styles.manageExpensesButtonText}>Direct Expenses</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={styles.logoutButton}
             onPress={logout}
             accessibilityRole="button"
@@ -123,6 +133,19 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   manageButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  manageExpensesButton: {
+    backgroundColor: '#000000',
+    borderRadius: 9999,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  manageExpensesButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',

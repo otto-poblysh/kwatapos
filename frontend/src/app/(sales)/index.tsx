@@ -167,6 +167,16 @@ export default function SalesDashboard() {
 
         <View style={styles.headerRight}>
           <TouchableOpacity
+            style={styles.expensesNavButton}
+            onPress={() => router.push('/(sales)/expenses')}
+            accessibilityRole="button"
+            accessibilityLabel="Expenses"
+            testID="sales-nav-expenses-btn"
+          >
+            <Text style={styles.expensesNavButtonText}>Expenses</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={styles.newTabButton}
             onPress={handleOpenNewTabModal}
             accessibilityRole="button"
@@ -445,6 +455,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+  },
+  expensesNavButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    borderRadius: 9999,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    minHeight: 44,
+    minWidth: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  expensesNavButtonText: {
+    color: '#111111',
+    fontSize: 14,
+    fontWeight: '700',
   },
   newTabButton: {
     backgroundColor: '#000000',
