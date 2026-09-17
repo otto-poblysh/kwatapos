@@ -35,13 +35,14 @@ We utilize a structured promotion pipeline to protect production data and ensure
 ## 3. Project Constraints
 
 ### Local Environment Ports
-To prevent conflicts with common default apps (like Next.js on 3000), always adhere to the following assignments:
-- **Expo Web:** `3010`
-- **Expo iOS Simulator:** `3011`
-- **Expo Android Emulator:** `3012`
-- **Rust Backend API:** `8095`
-- **PostgreSQL Database:** `5432`
+Kwata owns **3011–3020** on this machine. Poblysh owns **3000–3010**. Never bind Kwata below `3011`.
+
+- **Expo Web:** `3011`
+- **Expo iOS Simulator:** `3012`
+- **Expo Android Emulator:** `3013`
+- **Rust Backend API:** `3014`
+- **PostgreSQL Database:** Homebrew `postgresql@17` on `5432`, user `akamaotto`, database `kwatapos` (Poblysh uses the same cluster, database `poblysh`). Do not publish Docker Postgres on `5432`.
 
 ### Command & Debugging Tools
 - Use the `argent-*` suite of skills (e.g., `argent-ios-simulator-setup`, `argent-device-interact`, `argent-metro-debugger`) to seamlessly interact with React Native emulators.
-- The PostgreSQL instance is managed via Docker (running on Colima). Ensure containers are running (`docker-compose up -d`) before executing integration tests.
+- Local Postgres is Homebrew `postgresql@17` (`brew services start postgresql@17`). Copy `backend/.env.example` to `backend/.env` (`postgres://akamaotto@127.0.0.1:5432/kwatapos`). Rust fallbacks in `backend::database_url()` use the same URL. The optional `kwatapos_db` container publishes `127.0.0.1:55432` only; never `docker compose up` a Postgres that binds host `5432`.

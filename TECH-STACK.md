@@ -68,5 +68,5 @@ Based on our decision matrices for a POS system involving transactions, credits,
 
 - **Formatting/Linting (Rust):** `rustfmt` and `clippy`.
 - **Formatting/Linting (JS/TS):** `eslint` and `prettier`.
-- **Containerization:** Docker for standardizing the Rust backend deployment and database environments.
+- **Local database:** Homebrew `postgresql@17` on `5432`, user `akamaotto`, database `kwatapos` (same cluster as Poblysh’s `poblysh`). Docker Postgres is optional and must publish `55432`, never `5432`.
 - **CI/CD:** GitHub Actions to run tests, clippy checks, and build Expo variants.

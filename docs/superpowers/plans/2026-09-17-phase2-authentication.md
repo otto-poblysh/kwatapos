@@ -1,5 +1,9 @@
 # Phase 2: Authentication & User Management Implementation Plan
 
+> **Local DB (supersedes `.env` URL below):** `DATABASE_URL=postgres://akamaotto@127.0.0.1:5432/kwatapos`. Do not recreate Docker Postgres on `5432`.
+>
+> **Local HTTP (supersedes ports below):** Expo web `3011`, API `3014`. Kwata range is 3011–3020.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Secure the application by implementing role-based JWT authentication, a React Native login screen, and protected routing logic.
@@ -10,8 +14,8 @@
 
 ## Global Constraints
 
-- Backend API must run on port `8095`.
-- Expo must run web on `3010`.
+- Backend API must run on port `3014`.
+- Expo must run web on `3011`.
 - Passwords must be hashed using `argon2`.
 - Tokens must be JWTs (short-lived access token, long-lived refresh token).
 

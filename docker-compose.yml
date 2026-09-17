@@ -7,8 +7,10 @@ services:
       POSTGRES_USER: kwata_admin
       POSTGRES_PASSWORD: kwata_password
       POSTGRES_DB: kwatapos
+    # Host 5432 is Homebrew Postgres (user akamaotto: databases poblysh + kwatapos).
+    # This container is optional; do not publish 5432.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:55432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 

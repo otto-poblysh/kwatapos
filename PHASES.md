@@ -8,9 +8,9 @@ To ensure steady progress and allow for regular team reviews, the development of
 **Goal:** Establish the technical environments, folder structures, and communication between frontend, backend, and database.
 **Tasks:**
 - Initialize the Rust Axum backend and Expo React Native frontend.
-- Set up Docker/Colima for PostgreSQL.
+- Use Homebrew `postgresql@17` on `5432` as user `akamaotto` (database `kwatapos`, sharing the cluster with Poblysh’s `poblysh`). Do not bind Docker Postgres to `5432`.
 - Implement the Feature-First DDD folder structures outlined in `ARCHITECTURE.md`.
-- Configure the specific ports (Backend: 8095, Web: 3010, iOS: 3011, Android: 3012).
+- Configure the specific ports (Backend: 3014, Web: 3011, iOS: 3012, Android: 3013; Kwata range 3011–3020).
 - Apply initial design tokens (colors, typography) from `DESIGN.md` to the Expo app.
 **Deliverable (Demo):** 
 > The team can see an empty but styled React Native app running on Web, iOS, and Android simulators, successfully fetching a "System Online" message from the Rust backend connected to the local database.

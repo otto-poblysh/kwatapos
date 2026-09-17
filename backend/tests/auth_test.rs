@@ -8,8 +8,7 @@ use sqlx::postgres::PgPoolOptions;
 use tower::ServiceExt;
 
 async fn test_app() -> axum::Router {
-    let db_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://kwata_admin:kwata_password@127.0.0.1:5432/kwatapos".to_string());
+    let db_url = backend::database_url();
 
     let pool = PgPoolOptions::new()
         .max_connections(5)
