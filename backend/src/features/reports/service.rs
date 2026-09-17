@@ -29,36 +29,34 @@ fn zero_methods() -> BTreeMap<String, Decimal> {
 }
 
 pub async fn get_daily_report(pool: &PgPool) -> Result<DailyReportResponse, ReportError> {
-    let date = repository::current_date(pool)
-        .await
-        .map_err(ReportError::Database)?;
-    let rows = repository::daily_sales_by_payment_method(pool)
-        .await
-        .map_err(ReportError::Database)?;
-    let direct_expenses = repository::daily_approved_expenses_total(pool)
+    let rows = repository::load_daily_report(pool)
         .await
         .map_err(ReportError::Database)?;
 
     let mut by_payment_method = zero_methods();
     let mut total_sales = Decimal::ZERO;
+    let mut direct_expenses = Decimal::ZERO;
+    let mut date = String::new();
 
     for row in rows {
-        let method = row
-            .payment_method
-            .unwrap_or_else(|| "unknown".to_string())
-            .to_lowercase();
-        let amount = row.total;
-        total_sales += amount;
-        let entry = by_payment_method.entry(method).or_insert(Decimal::ZERO);
-        *entry += amount;
+        if date.is_empty() {
+            date = row.date;
+            direct_expenses = row.direct_expenses;
+        }
+        if let Some(method) = row.payment_method {
+            let method = method.to_lowercase();
+            total_sales += row.sales_total;
+            let entry = by_payment_method.entry(method).or_insert(Decimal::ZERO);
+            *entry += row.sales_total;
+        }
     }
 
-    let cash = *by_payment_method
-        .get("cash")
-        .unwrap_or(&Decimal::ZERO);
-    let credit_issued = *by_payment_method
-        .get("credit")
-        .unwrap_or(&Decimal::ZERO);
+    if date.is_empty() {
+        date = chrono::Local::now().date_naive().to_string();
+    }
+
+    let cash = *by_payment_method.get("cash").unwrap_or(&Decimal::ZERO);
+    let credit_issued = *by_payment_method.get("credit").unwrap_or(&Decimal::ZERO);
     let expected_cash_drawer = cash - direct_expenses;
 
     Ok(DailyReportResponse {

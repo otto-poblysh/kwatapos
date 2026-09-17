@@ -69,21 +69,21 @@ pub async fn create_requisition(
         }
     }
 
-    // Verify products exist
+    // Verify products exist in a single query
+    let mut unique_ids: Vec<Uuid> = Vec::new();
+    let mut seen = HashSet::new();
     for item in &req.items {
-        let exists = sqlx::query_scalar::<_, bool>(
-            "SELECT EXISTS(SELECT 1 FROM products WHERE id = $1)",
-        )
-        .bind(item.product_id)
-        .fetch_one(pool)
+        if seen.insert(item.product_id) {
+            unique_ids.push(item.product_id);
+        }
+    }
+    let found = repository::count_existing_products(pool, &unique_ids)
         .await
         .map_err(RequisitionError::Database)?;
-
-        if !exists {
-            return Err(RequisitionError::ValidationError(
-                "Product not found".to_string(),
-            ));
-        }
+    if found as usize != unique_ids.len() {
+        return Err(RequisitionError::ValidationError(
+            "Product not found".to_string(),
+        ));
     }
 
     let mut tx = pool.begin().await.map_err(RequisitionError::Database)?;
@@ -92,17 +92,22 @@ pub async fn create_requisition(
         .await
         .map_err(RequisitionError::Database)?;
 
-    for item in &req.items {
-        repository::add_requisition_item_tx(
-            &mut tx,
-            requisition.id,
-            item.product_id,
-            item.quantity,
-            rescale_2(item.expected_price),
-        )
-        .await
-        .map_err(RequisitionError::Database)?;
-    }
+    let product_ids: Vec<Uuid> = req.items.iter().map(|item| item.product_id).collect();
+    let quantities: Vec<i32> = req.items.iter().map(|item| item.quantity).collect();
+    let expected_prices: Vec<Decimal> = req
+        .items
+        .iter()
+        .map(|item| rescale_2(item.expected_price))
+        .collect();
+    repository::add_requisition_items_tx(
+        &mut tx,
+        requisition.id,
+        &product_ids,
+        &quantities,
+        &expected_prices,
+    )
+    .await
+    .map_err(RequisitionError::Database)?;
 
     let items = repository::get_requisition_items_tx(&mut tx, requisition.id)
         .await

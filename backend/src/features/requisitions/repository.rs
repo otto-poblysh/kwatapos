@@ -85,6 +85,38 @@ pub async fn add_requisition_item_tx(
     .await
 }
 
+pub async fn add_requisition_items_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    requisition_id: Uuid,
+    product_ids: &[Uuid],
+    quantities: &[i32],
+    expected_prices: &[Decimal],
+) -> Result<u64, sqlx::Error> {
+    let result = sqlx::query(
+        "INSERT INTO requisition_items (requisition_id, product_id, quantity, expected_price) \
+         SELECT $1, t.product_id, t.quantity, t.expected_price \
+         FROM UNNEST($2::uuid[], $3::int4[], $4::numeric[]) \
+         AS t(product_id, quantity, expected_price)",
+    )
+    .bind(requisition_id)
+    .bind(product_ids)
+    .bind(quantities)
+    .bind(expected_prices)
+    .execute(&mut **tx)
+    .await?;
+    Ok(result.rows_affected())
+}
+
+pub async fn count_existing_products(
+    pool: &PgPool,
+    product_ids: &[Uuid],
+) -> Result<i64, sqlx::Error> {
+    sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM products WHERE id = ANY($1)")
+        .bind(product_ids)
+        .fetch_one(pool)
+        .await
+}
+
 pub async fn get_requisitions(pool: &PgPool) -> Result<Vec<Requisition>, sqlx::Error> {
     sqlx::query_as::<_, Requisition>(
         "SELECT id, token, title, status, created_at, updated_at \
