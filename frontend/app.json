@@ -1,16 +1,18 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "Kwata POS",
+    "slug": "kwatapos",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "kwatapos",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.kwata.pos"
     },
     "android": {
+      "package": "com.kwata.pos",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
