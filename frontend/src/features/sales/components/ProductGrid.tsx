@@ -54,7 +54,13 @@ export function ProductGrid({
       }
       const data = await res.json();
       if (isMountedRef.current) {
-        setProducts(data);
+        const normalized = Array.isArray(data)
+          ? data.map((p) => ({
+              ...p,
+              price: typeof p.price === 'string' ? parseFloat(p.price) : Number(p.price),
+            }))
+          : data;
+        setProducts(normalized);
       }
     } catch (err: any) {
       if (isMountedRef.current) {

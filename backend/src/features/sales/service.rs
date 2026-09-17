@@ -1,3 +1,4 @@
+use rust_decimal::Decimal;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -62,8 +63,8 @@ pub async fn create_cash_order(
 
     let mut tx = pool.begin().await.map_err(SalesError::Database)?;
 
-    let mut total_amount: f64 = 0.0;
-    let mut resolved_items: Vec<(Uuid, i32, f64)> = Vec::with_capacity(items.len());
+    let mut total_amount = Decimal::ZERO;
+    let mut resolved_items: Vec<(Uuid, i32, Decimal)> = Vec::with_capacity(items.len());
 
     for item in &items {
         let product = get_product_by_id_tx(&mut tx, item.product_id)
@@ -79,8 +80,9 @@ pub async fn create_cash_order(
             Err(e) => return Err(SalesError::Database(e)),
         }
 
-        total_amount += product.price * (item.quantity as f64);
-        resolved_items.push((item.product_id, item.quantity, product.price));
+        let unit_price = product.price;
+        total_amount += unit_price * Decimal::from(item.quantity);
+        resolved_items.push((item.product_id, item.quantity, unit_price));
     }
 
     let order = repository::create_order_tx(&mut tx, "cash", total_amount, "completed")

@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
@@ -7,7 +8,7 @@ use uuid::Uuid;
 pub struct Product {
     pub id: Uuid,
     pub name: String,
-    pub price: f64,
+    pub price: Decimal,
     pub category: String,
     pub created_at: DateTime<Utc>,
 }
@@ -23,7 +24,7 @@ pub struct Inventory {
 pub struct ProductWithInventory {
     pub id: Uuid,
     pub name: String,
-    pub price: f64,
+    pub price: Decimal,
     pub category: String,
     pub created_at: DateTime<Utc>,
     pub quantity: i32,
@@ -129,7 +130,7 @@ pub async fn decrement_inventory_tx<'a>(
 pub async fn create_product(
     pool: &PgPool,
     name: &str,
-    price: f64,
+    price: Decimal,
     category: &str,
 ) -> Result<Product, sqlx::Error> {
     sqlx::query_as::<_, Product>(

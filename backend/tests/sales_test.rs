@@ -8,6 +8,7 @@ use sqlx::postgres::PgPoolOptions;
 use tower::ServiceExt;
 
 use backend::features::inventory::repository::{create_product, get_inventory, set_inventory};
+use rust_decimal::Decimal;
 
 async fn test_app_and_pool() -> (axum::Router, sqlx::PgPool) {
     let db_url = backend::database_url();
@@ -63,13 +64,17 @@ async fn test_get_products_returns_200_and_list() {
     assert!(first.get("price").is_some());
     assert!(first.get("category").is_some());
     assert!(first.get("quantity").is_some());
+
+    let product_list: Vec<backend::features::inventory::repository::ProductWithInventory> =
+        serde_json::from_slice(&body).unwrap();
+    assert!(product_list[0].price > Decimal::ZERO);
 }
 
 #[tokio::test]
 async fn test_post_orders_cash_success_and_decrements_inventory() {
     let (app, pool) = test_app_and_pool().await;
 
-    let test_product = create_product(&pool, "Cash Order Beer", 750.0, "beer")
+    let test_product = create_product(&pool, "Cash Order Beer", Decimal::from(750), "beer")
         .await
         .expect("Failed to create test product");
 
@@ -106,13 +111,18 @@ async fn test_post_orders_cash_success_and_decrements_inventory() {
     assert!(json.get("id").is_some());
     assert_eq!(json["status"], "completed");
     assert_eq!(json["payment_method"], "cash");
-    assert_eq!(json["total_amount"], 2250.0);
+    assert_eq!(json["total_amount"], "2250.00");
 
     let items = json["items"].as_array().expect("items array missing");
     assert_eq!(items.len(), 1);
     assert_eq!(items[0]["product_id"], test_product.id.to_string());
     assert_eq!(items[0]["quantity"], 3);
-    assert_eq!(items[0]["unit_price"], 750.0);
+    assert_eq!(items[0]["unit_price"], "750.00");
+
+    let order_resp: backend::features::sales::dto::OrderResponse =
+        serde_json::from_slice(&body).unwrap();
+    assert_eq!(order_resp.total_amount, Decimal::from(2250));
+    assert_eq!(order_resp.items[0].unit_price, Decimal::from(750));
 
     // Verify inventory decrement in database
     let inv = get_inventory(&pool, test_product.id)
@@ -132,7 +142,7 @@ async fn test_post_orders_cash_success_and_decrements_inventory() {
 async fn test_post_orders_cash_insufficient_stock_returns_400_and_rolls_back() {
     let (app, pool) = test_app_and_pool().await;
 
-    let test_product = create_product(&pool, "Limited Stock Item", 1200.0, "food")
+    let test_product = create_product(&pool, "Limited Stock Item", Decimal::from(1200), "food")
         .await
         .expect("Failed to create test product");
 
@@ -212,7 +222,7 @@ async fn test_post_orders_cash_empty_items_returns_400() {
 async fn test_post_orders_cash_non_positive_quantity_returns_400() {
     let (app, pool) = test_app_and_pool().await;
 
-    let test_product = create_product(&pool, "Zero Qty Item", 500.0, "drink")
+    let test_product = create_product(&pool, "Zero Qty Item", Decimal::from(500), "drink")
         .await
         .expect("Failed to create test product");
 
@@ -280,12 +290,12 @@ async fn test_post_orders_cash_non_positive_quantity_returns_400() {
 async fn test_post_orders_cash_multi_item_success() {
     let (app, pool) = test_app_and_pool().await;
 
-    let p1 = create_product(&pool, "Multi Item 1", 500.0, "drink")
+    let p1 = create_product(&pool, "Multi Item 1", Decimal::from(500), "drink")
         .await
         .expect("Failed to create p1");
     set_inventory(&pool, p1.id, 10).await.unwrap();
 
-    let p2 = create_product(&pool, "Multi Item 2", 1500.0, "food")
+    let p2 = create_product(&pool, "Multi Item 2", Decimal::from(1500), "food")
         .await
         .expect("Failed to create p2");
     set_inventory(&pool, p2.id, 5).await.unwrap();
@@ -314,9 +324,13 @@ async fn test_post_orders_cash_multi_item_success() {
     let body = response.into_body().collect().await.unwrap().to_bytes();
     let json: Value = serde_json::from_slice(&body).unwrap();
 
-    // 2 * 500 + 3 * 1500 = 1000 + 4500 = 5500.0
-    assert_eq!(json["total_amount"], 5500.0);
+    // 2 * 500 + 3 * 1500 = 1000 + 4500 = 5500.00
+    assert_eq!(json["total_amount"], "5500.00");
     assert_eq!(json["items"].as_array().unwrap().len(), 2);
+
+    let order_resp: backend::features::sales::dto::OrderResponse =
+        serde_json::from_slice(&body).unwrap();
+    assert_eq!(order_resp.total_amount, Decimal::from(5500));
 
     let inv1 = get_inventory(&pool, p1.id).await.unwrap().unwrap();
     assert_eq!(inv1.quantity, 8); // 10 - 2
@@ -330,7 +344,7 @@ async fn test_post_orders_cash_multi_item_success() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(db_order.total_amount, 5500.0);
+    assert_eq!(db_order.total_amount, Decimal::from(5500));
     assert_eq!(db_order.payment_method, "cash");
 
     let db_items = backend::features::sales::repository::get_order_items_by_order_id(&pool, order_id)
@@ -350,12 +364,12 @@ async fn test_post_orders_cash_multi_item_success() {
 async fn test_post_orders_cash_multi_item_rollback_on_partial_failure() {
     let (app, pool) = test_app_and_pool().await;
 
-    let p1 = create_product(&pool, "Rollback Item 1", 300.0, "drink")
+    let p1 = create_product(&pool, "Rollback Item 1", Decimal::from(300), "drink")
         .await
         .unwrap();
     set_inventory(&pool, p1.id, 10).await.unwrap();
 
-    let p2 = create_product(&pool, "Rollback Item 2", 800.0, "food")
+    let p2 = create_product(&pool, "Rollback Item 2", Decimal::from(800), "food")
         .await
         .unwrap();
     set_inventory(&pool, p2.id, 2).await.unwrap();

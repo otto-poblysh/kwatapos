@@ -31,9 +31,13 @@ export const useCartStore = create<CartState>((set, get) => ({
   items: [],
 
   addItem: (product: Product) => {
+    const itemProduct = {
+      ...product,
+      price: typeof product.price === 'string' ? parseFloat(product.price) : Number(product.price),
+    };
     set((state) => {
       const existingIndex = state.items.findIndex(
-        (item) => item.product.id === product.id
+        (item) => item.product.id === itemProduct.id
       );
 
       if (existingIndex > -1) {
@@ -46,7 +50,7 @@ export const useCartStore = create<CartState>((set, get) => ({
       }
 
       return {
-        items: [...state.items, { product, quantity: 1 }],
+        items: [...state.items, { product: itemProduct, quantity: 1 }],
       };
     });
   },

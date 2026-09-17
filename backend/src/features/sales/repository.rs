@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool, Postgres, Transaction};
 use uuid::Uuid;
@@ -7,7 +8,7 @@ use uuid::Uuid;
 pub struct Order {
     pub id: Uuid,
     pub payment_method: String,
-    pub total_amount: f64,
+    pub total_amount: Decimal,
     pub status: String,
     pub created_at: DateTime<Utc>,
 }
@@ -18,14 +19,14 @@ pub struct OrderItem {
     pub order_id: Uuid,
     pub product_id: Uuid,
     pub quantity: i32,
-    pub unit_price: f64,
+    pub unit_price: Decimal,
     pub created_at: DateTime<Utc>,
 }
 
 pub async fn create_order_tx<'a>(
     tx: &mut Transaction<'a, Postgres>,
     payment_method: &str,
-    total_amount: f64,
+    total_amount: Decimal,
     status: &str,
 ) -> Result<Order, sqlx::Error> {
     sqlx::query_as::<_, Order>(
@@ -45,7 +46,7 @@ pub async fn create_order_item_tx<'a>(
     order_id: Uuid,
     product_id: Uuid,
     quantity: i32,
-    unit_price: f64,
+    unit_price: Decimal,
 ) -> Result<OrderItem, sqlx::Error> {
     sqlx::query_as::<_, OrderItem>(
         "INSERT INTO order_items (order_id, product_id, quantity, unit_price) \

@@ -2,6 +2,7 @@ use backend::features::inventory::repository::{
     create_product, decrement_inventory, decrement_inventory_tx, get_all_products,
     get_all_products_with_inventory, get_inventory, get_product_by_id, set_inventory,
 };
+use rust_decimal::Decimal;
 use sqlx::postgres::PgPoolOptions;
 
 #[tokio::test]
@@ -32,11 +33,11 @@ async fn test_products_and_inventory_seeded_data() {
 
     // Verify each expected seeded product exists
     let expected_seeds = vec![
-        ("Castel Beer", 650.0, "beer", 50),
-        ("Guinness", 1000.0, "beer", 40),
-        ("Heineken", 1000.0, "beer", 30),
-        ("Roasted Fish (Medium)", 2500.0, "fish", 20),
-        ("Roasted Fish (Large)", 4000.0, "fish", 15),
+        ("Castel Beer", Decimal::from(650), "beer", 50),
+        ("Guinness", Decimal::from(1000), "beer", 40),
+        ("Heineken", Decimal::from(1000), "beer", 30),
+        ("Roasted Fish (Medium)", Decimal::from(2500), "fish", 20),
+        ("Roasted Fish (Large)", Decimal::from(4000), "fish", 15),
     ];
 
     for (name, price, category, expected_qty) in expected_seeds {
@@ -103,7 +104,7 @@ async fn test_inventory_decrement_and_transactions() {
         .expect("Failed to run migrations");
 
     // Create a temporary product for mutation tests to avoid altering seed data
-    let test_product = create_product(&pool, "Integration Test Drink", 150.0, "drink")
+    let test_product = create_product(&pool, "Integration Test Drink", Decimal::from(150), "drink")
         .await
         .expect("Failed to create test product");
 
@@ -189,7 +190,7 @@ async fn test_inventory_decrement_underflow_and_validation() {
         .await
         .expect("Failed to run migrations");
 
-    let test_product = create_product(&pool, "Underflow Test Product", 300.0, "test")
+    let test_product = create_product(&pool, "Underflow Test Product", Decimal::from(300), "test")
         .await
         .expect("Failed to create test product");
 

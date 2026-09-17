@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS products (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
-    price DOUBLE PRECISION NOT NULL,
+    price DECIMAL(12, 2) NOT NULL CHECK (price >= 0),
     category VARCHAR(50) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

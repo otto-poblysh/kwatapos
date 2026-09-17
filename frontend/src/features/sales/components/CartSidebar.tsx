@@ -67,7 +67,9 @@ export function CartSidebar({
       const data = await res.json();
 
       if (res.status === 201) {
-        const totalFormatted = `${(data.total_amount ?? totalPrice).toLocaleString()} FCFA`;
+        const rawTotal = data.total_amount ?? totalPrice;
+        const numericTotal = typeof rawTotal === 'string' ? parseFloat(rawTotal) : Number(rawTotal);
+        const totalFormatted = `${(isNaN(numericTotal) ? rawTotal : numericTotal).toLocaleString()} FCFA`;
         const successMsg = `Order completed successfully! Total: ${totalFormatted}`;
         setSuccessMessage(successMsg);
         clearCart();
