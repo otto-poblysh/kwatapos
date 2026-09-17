@@ -5,6 +5,12 @@ use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
+pub mod features;
+
+pub async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
+    sqlx::migrate!("./migrations").run(pool).await
+}
+
 #[derive(Clone, Default)]
 pub struct AppState {
     pub pool: Option<PgPool>,
@@ -27,6 +33,7 @@ pub fn app_with_state(state: AppState) -> Router {
     Router::new()
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .route("/api/health", get(health_check))
+        .nest("/api/auth", features::auth::controller::router())
         .layer(CorsLayer::permissive())
         .with_state(state)
 }

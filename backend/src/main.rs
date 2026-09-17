@@ -3,12 +3,17 @@ use sqlx::postgres::PgPoolOptions;
 
 #[tokio::main]
 async fn main() {
+    dotenvy::dotenv().ok();
+
     let db_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://kwata_admin:kwata_password@127.0.0.1:5432/kwatapos".to_string());
 
     let pool = match PgPoolOptions::new().max_connections(5).connect(&db_url).await {
         Ok(p) => {
             println!("Connected to PostgreSQL database at {}", db_url);
+            backend::run_migrations(&p)
+                .await
+                .expect("Failed to run database migrations");
             Some(p)
         }
         Err(e) => {

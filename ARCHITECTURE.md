@@ -95,7 +95,7 @@ A `docker-compose.yml` in the `backend/` directory will spin up the PostgreSQL i
 version: '3.8'
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     container_name: kwatapos_db
     environment:
       POSTGRES_USER: kwata_admin

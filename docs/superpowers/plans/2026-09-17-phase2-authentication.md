@@ -52,6 +52,27 @@ To consider this phase complete, the following tests must pass, **backed by scre
 
 ---
 
+### Task 0: Phase 1 Cleanup & Parity
+
+**Goal:** Ensure the previous phase adheres strictly to TDD and `DESIGN.md` guidelines before moving forward.
+
+**Files:**
+- Modify: `frontend/src/app/index.tsx`
+- Create: `frontend/src/app/index.test.tsx`
+- Create: `backend/.env`
+- Modify: `backend/src/main.rs`
+
+- [ ] **Step 1: Fix Frontend Design Parity**
+Open `frontend/src/app/index.tsx`. Remove the drop shadow styles (`shadowColor`, `shadowOffset`, `shadowOpacity`, `shadowRadius`, `elevation`) from the `card` style block to adhere to the "Flat-By-Default Rule" in `DESIGN.md`. Add a subtle border (`borderWidth: 1, borderColor: '#E5E5EA'`) to maintain definition.
+- [ ] **Step 2: Add Missing Frontend TDD Tests**
+Create `frontend/src/app/index.test.tsx`. Write a test using Jest and `@testing-library/react-native` to mount `<Home />` and assert that the `ActivityIndicator` or "Loading..." text is rendered initially.
+- [ ] **Step 3: Setup Backend Environment Variables**
+Create `backend/.env` containing `DATABASE_URL=postgres://kwata_admin:kwata_password@127.0.0.1:5432/kwatapos`. Modify `backend/src/main.rs` to load `.env` (using the `dotenvy` crate) instead of hardcoding the URL. Update `Cargo.toml` to include `dotenvy = "0.15"`.
+- [ ] **Step 4: Commit**
+`git commit -am "fix: resolve phase 1 TDD and design parity gaps"`
+
+---
+
 ### Task 1: Database Migrations (Users & Roles)
 
 **Files:**
