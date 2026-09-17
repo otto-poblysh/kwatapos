@@ -128,3 +128,16 @@ pub async fn get_credits_by_customer(
     .fetch_all(pool)
     .await
 }
+
+pub async fn get_outstanding_balance(
+    pool: &PgPool,
+    customer_id: Uuid,
+) -> Result<Decimal, sqlx::Error> {
+    sqlx::query_scalar::<_, Decimal>(
+        "SELECT COALESCE(SUM(amount), 0) FROM credits \
+         WHERE customer_id = $1 AND status = 'unpaid'",
+    )
+    .bind(customer_id)
+    .fetch_one(pool)
+    .await
+}

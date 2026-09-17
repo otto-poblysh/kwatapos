@@ -46,6 +46,8 @@ pub fn app_with_state(state: AppState) -> Router {
         .route("/api/health", get(health_check))
         .nest("/api/auth", features::auth::controller::router())
         .nest("/api/customers", features::customers::controller::router())
+        .nest("/api/customer", features::customers::controller::portal_router())
+        .nest("/api/reports", features::reports::controller::router())
         .nest("/api/requisitions", features::requisitions::controller::router())
         .nest("/api/public/requisition", features::requisitions::controller::public_router())
         .nest("/api/expenses", features::expenses::controller::router())

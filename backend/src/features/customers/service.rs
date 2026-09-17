@@ -1,9 +1,10 @@
 use sqlx::PgPool;
+use uuid::Uuid;
 
 use crate::features::auth::service::hash_password;
 
 use super::{
-    dto::{CreateCustomerRequest, CustomerResponse},
+    dto::{CreateCustomerRequest, CustomerPortalResponse, CustomerResponse, CreditHistoryItem},
     repository,
 };
 
@@ -11,6 +12,7 @@ use super::{
 pub enum CustomerError {
     InvalidInput(String),
     PhoneAlreadyExists(String),
+    NotFound(String),
     Database(sqlx::Error),
 }
 
@@ -21,6 +23,7 @@ impl std::fmt::Display for CustomerError {
             Self::PhoneAlreadyExists(phone) => {
                 write!(f, "Customer with phone {} already exists", phone)
             }
+            Self::NotFound(msg) => write!(f, "{msg}"),
             Self::Database(e) => write!(f, "Database error: {}", e),
         }
     }
@@ -87,4 +90,30 @@ pub async fn create_customer(
         }
         Err(e) => Err(CustomerError::Database(e)),
     }
+}
+
+pub async fn get_portal_profile(
+    pool: &PgPool,
+    customer_id: Uuid,
+) -> Result<CustomerPortalResponse, CustomerError> {
+    let customer = repository::find_by_id(pool, customer_id)
+        .await
+        .map_err(CustomerError::Database)?
+        .ok_or_else(|| CustomerError::NotFound("Customer no longer exists".to_string()))?;
+
+    let credits = repository::get_credits_by_customer(pool, customer_id)
+        .await
+        .map_err(CustomerError::Database)?;
+
+    let outstanding_balance = repository::get_outstanding_balance(pool, customer_id)
+        .await
+        .map_err(CustomerError::Database)?;
+
+    Ok(CustomerPortalResponse {
+        id: customer.id,
+        name: customer.name,
+        phone_number: customer.phone_number,
+        outstanding_balance,
+        credits: credits.into_iter().map(CreditHistoryItem::from).collect(),
+    })
 }

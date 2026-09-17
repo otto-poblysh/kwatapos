@@ -2,10 +2,13 @@ use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
+use axum::http::{header, HeaderMap};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
+
+use crate::features::customers::repository as customers_repository;
 
 use super::repository::{self, UserResponse};
 
@@ -29,6 +32,7 @@ pub struct LoginResponse {
 pub enum AuthError {
     InvalidCredentials,
     InvalidToken,
+    Forbidden,
     Database(sqlx::Error),
     TokenCreation(String),
 }
@@ -38,6 +42,7 @@ impl std::fmt::Display for AuthError {
         match self {
             Self::InvalidCredentials => write!(f, "Invalid email or password"),
             Self::InvalidToken => write!(f, "Invalid or expired token"),
+            Self::Forbidden => write!(f, "Forbidden"),
             Self::Database(e) => write!(f, "Database error: {}", e),
             Self::TokenCreation(e) => write!(f, "Token creation error: {}", e),
         }
@@ -146,6 +151,72 @@ pub fn verify_refresh_token(token: &str) -> Result<Claims, AuthError> {
         return Err(AuthError::InvalidToken);
     }
     Ok(claims)
+}
+
+pub fn claims_from_authorization_header(headers: &HeaderMap) -> Result<Claims, AuthError> {
+    let auth_header = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .ok_or(AuthError::InvalidToken)?;
+    let token = auth_header
+        .strip_prefix("Bearer ")
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .ok_or(AuthError::InvalidToken)?;
+    verify_access_token(token)
+}
+
+pub fn require_role(claims: &Claims, allowed: &[&str]) -> Result<(), AuthError> {
+    if allowed.iter().any(|role| *role == claims.role) {
+        Ok(())
+    } else {
+        Err(AuthError::Forbidden)
+    }
+}
+
+async fn find_customer_auth_by_phone(
+    pool: &PgPool,
+    phone: &str,
+) -> Result<Option<customers_repository::CustomerAuth>, sqlx::Error> {
+    let mut customer = customers_repository::find_auth_by_phone(pool, phone).await?;
+    if customer.is_none() && !phone.starts_with('+') {
+        let with_plus = format!("+{phone}");
+        customer = customers_repository::find_auth_by_phone(pool, &with_plus).await?;
+    }
+    Ok(customer)
+}
+
+pub async fn customer_login(
+    pool: &PgPool,
+    phone_number: &str,
+    pin: &str,
+) -> Result<LoginResponse, AuthError> {
+    let phone = phone_number.trim();
+    if phone.is_empty() || pin.trim().is_empty() {
+        return Err(AuthError::InvalidCredentials);
+    }
+
+    let customer = find_customer_auth_by_phone(pool, phone)
+        .await
+        .map_err(AuthError::Database)?
+        .ok_or(AuthError::InvalidCredentials)?;
+
+    if !verify_password(pin.trim(), &customer.pin_hash) {
+        return Err(AuthError::InvalidCredentials);
+    }
+
+    let (access_token, refresh_token) =
+        generate_tokens(&customer.id, &customer.phone_number, "customer")?;
+
+    Ok(LoginResponse {
+        access_token,
+        refresh_token,
+        user: UserResponse {
+            id: customer.id,
+            email: customer.phone_number,
+            role: "customer".to_string(),
+        },
+    })
 }
 
 pub async fn login(

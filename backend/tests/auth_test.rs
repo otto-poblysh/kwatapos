@@ -6,8 +6,13 @@ use http_body_util::BodyExt;
 use serde_json::{json, Value};
 use sqlx::postgres::PgPoolOptions;
 use tower::ServiceExt;
+use uuid::Uuid;
 
 async fn test_app() -> axum::Router {
+    test_app_and_pool().await.0
+}
+
+async fn test_app_and_pool() -> (axum::Router, sqlx::PgPool) {
     let db_url = backend::database_url();
 
     let pool = PgPoolOptions::new()
@@ -20,7 +25,11 @@ async fn test_app() -> axum::Router {
         .await
         .expect("Failed to run migrations");
 
-    backend::app_with_state(backend::AppState { pool: Some(pool) })
+    let app = backend::app_with_state(backend::AppState {
+        pool: Some(pool.clone()),
+    });
+
+    (app, pool)
 }
 
 #[tokio::test]
@@ -416,5 +425,168 @@ async fn test_refresh_with_access_token_rejected() {
         .unwrap();
 
     assert_eq!(refresh_res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_customer_login_issues_jwt_and_returns_portal_profile() {
+    let (app, pool) = test_app_and_pool().await;
+    let phone = format!("+2376{}", &Uuid::new_v4().simple().to_string()[..8]);
+    let pin = "4821";
+    let pin_hash = backend::features::auth::service::hash_password(pin).unwrap();
+
+    let customer = backend::features::customers::repository::create_customer(
+        &pool,
+        "Portal Customer",
+        &phone,
+        &pin_hash,
+    )
+    .await
+    .expect("Failed to create customer");
+
+    let mut tx = pool.begin().await.expect("Failed to start transaction");
+    let amount = rust_decimal::Decimal::new(15000, 2);
+    let order = backend::features::sales::repository::create_order_tx(
+        &mut tx,
+        Some("Tab A"),
+        Some("credit"),
+        amount,
+        "completed",
+    )
+    .await
+    .expect("Failed to create credit order");
+    backend::features::customers::repository::create_credit_tx(
+        &mut tx,
+        customer.id,
+        order.id,
+        amount,
+        "unpaid",
+    )
+    .await
+    .expect("Failed to create credit");
+    tx.commit().await.expect("Failed to commit credit");
+
+    let login_payload = json!({
+        "phone_number": phone,
+        "pin": pin
+    });
+
+    let login_res = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/auth/customer")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&login_payload).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(login_res.status(), StatusCode::OK);
+    let login_body = login_res.into_body().collect().await.unwrap().to_bytes();
+    let login_json: Value = serde_json::from_slice(&login_body).unwrap();
+    assert!(login_json.get("access_token").is_some());
+    assert!(login_json.get("refresh_token").is_some());
+    assert_eq!(login_json["user"]["role"], "customer");
+    assert_eq!(login_json["user"]["id"], customer.id.to_string());
+    assert!(login_json["user"].get("password_hash").is_none());
+    assert!(login_json["user"].get("pin_hash").is_none());
+
+    let access_token = login_json["access_token"].as_str().unwrap().to_string();
+    let (app2, _) = test_app_and_pool().await;
+    let me_res = app2
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/customer/me")
+                .header(header::AUTHORIZATION, format!("Bearer {access_token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(me_res.status(), StatusCode::OK);
+    let me_body = me_res.into_body().collect().await.unwrap().to_bytes();
+    let me_json: Value = serde_json::from_slice(&me_body).unwrap();
+    assert_eq!(me_json["id"], customer.id.to_string());
+    assert_eq!(me_json["name"], "Portal Customer");
+    assert_eq!(me_json["phone_number"], phone);
+    assert_eq!(me_json["outstanding_balance"], "150.00");
+    assert_eq!(me_json["credits"].as_array().unwrap().len(), 1);
+    assert_eq!(me_json["credits"][0]["amount"], "150.00");
+    assert_eq!(me_json["credits"][0]["status"], "unpaid");
+}
+
+#[tokio::test]
+async fn test_customer_login_invalid_pin_is_unauthorized() {
+    let (app, pool) = test_app_and_pool().await;
+    let phone = format!("+2376{}", &Uuid::new_v4().simple().to_string()[..8]);
+    let pin_hash = backend::features::auth::service::hash_password("1111").unwrap();
+    backend::features::customers::repository::create_customer(
+        &pool,
+        "Wrong Pin Customer",
+        &phone,
+        &pin_hash,
+    )
+    .await
+    .expect("Failed to create customer");
+
+    let payload = json!({
+        "phone_number": phone,
+        "pin": "9999"
+    });
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/auth/customer")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&payload).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_customer_me_rejects_staff_token() {
+    let app = test_app().await;
+    let login_payload = json!({
+        "email": "admin@kwatapos.com",
+        "password": "admin123"
+    });
+    let login_res = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/auth/login")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&login_payload).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let login_body = login_res.into_body().collect().await.unwrap().to_bytes();
+    let login_json: Value = serde_json::from_slice(&login_body).unwrap();
+    let access_token = login_json["access_token"].as_str().unwrap();
+
+    let (app2, _) = test_app_and_pool().await;
+    let me_res = app2
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/customer/me")
+                .header(header::AUTHORIZATION, format!("Bearer {access_token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(me_res.status(), StatusCode::FORBIDDEN);
 }
 

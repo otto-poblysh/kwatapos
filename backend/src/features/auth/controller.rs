@@ -23,6 +23,12 @@ pub struct LoginRequest {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct CustomerLoginRequest {
+    pub phone_number: String,
+    pub pin: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct RefreshRequest {
     pub refresh_token: String,
 }
@@ -35,6 +41,7 @@ pub struct RefreshResponse {
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/login", post(login_handler))
+        .route("/customer", post(customer_login_handler))
         .route("/refresh", post(refresh_handler))
         .route("/me", get(me_handler))
 }
@@ -63,6 +70,39 @@ pub async fn login_handler(
             .into_response(),
         Err(e) => {
             eprintln!("Internal auth error during login: {e}");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Internal server error"})),
+            )
+                .into_response()
+        }
+    }
+}
+
+pub async fn customer_login_handler(
+    State(state): State<AppState>,
+    Json(payload): Json<CustomerLoginRequest>,
+) -> Response {
+    let pool = match &state.pool {
+        Some(p) => p,
+        None => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database unconfigured"})),
+            )
+                .into_response();
+        }
+    };
+
+    match service::customer_login(pool, &payload.phone_number, &payload.pin).await {
+        Ok(login_response) => (StatusCode::OK, Json(login_response)).into_response(),
+        Err(AuthError::InvalidCredentials) => (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "Invalid phone number or PIN"})),
+        )
+            .into_response(),
+        Err(e) => {
+            eprintln!("Internal auth error during customer login: {e}");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({"error": "Internal server error"})),
