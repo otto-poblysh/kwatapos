@@ -12,9 +12,10 @@ function NavigationGuard() {
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    const isPublic = segments[0] === 'public';
 
     if (!user) {
-      if (!inAuthGroup) {
+      if (!inAuthGroup && !isPublic) {
         router.replace('/(auth)/login');
       }
     } else {
