@@ -3,10 +3,7 @@ use sqlx::postgres::PgPoolOptions;
 
 #[tokio::main]
 async fn main() {
-    dotenvy::dotenv().ok();
-
-    let db_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://kwata_admin:kwata_password@127.0.0.1:5432/kwatapos".to_string());
+    let db_url = backend::database_url();
 
     let pool = match PgPoolOptions::new().max_connections(5).connect(&db_url).await {
         Ok(p) => {
@@ -25,8 +22,13 @@ async fn main() {
     let state = AppState { pool };
     let app = app_with_state(state);
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8095").await.unwrap();
-    println!("Backend server listening on 8095");
-    println!("Swagger UI available at http://127.0.0.1:8095/swagger-ui/");
+    let listener = tokio::net::TcpListener::bind(("0.0.0.0", backend::BACKEND_PORT))
+        .await
+        .unwrap();
+    println!("Backend server listening on {}", backend::BACKEND_PORT);
+    println!(
+        "Swagger UI available at http://127.0.0.1:{}/swagger-ui/",
+        backend::BACKEND_PORT
+    );
     axum::serve(listener, app).await.unwrap();
 }

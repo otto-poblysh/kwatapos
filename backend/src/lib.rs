@@ -7,6 +7,17 @@ use utoipa_swagger_ui::SwaggerUi;
 
 pub mod features;
 
+/// Homebrew `postgresql@17` on 5432, shared with Poblysh as user `akamaotto`.
+pub const DEFAULT_DATABASE_URL: &str = "postgres://akamaotto@127.0.0.1:5432/kwatapos";
+
+/// Kwata HTTP range is 3011–3020; Poblysh uses 3000–3010.
+pub const BACKEND_PORT: u16 = 3014;
+
+pub fn database_url() -> String {
+    dotenvy::dotenv().ok();
+    std::env::var("DATABASE_URL").unwrap_or_else(|_| DEFAULT_DATABASE_URL.to_string())
+}
+
 pub async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
     sqlx::migrate!("./migrations").run(pool).await
 }
@@ -34,6 +45,7 @@ pub fn app_with_state(state: AppState) -> Router {
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .route("/api/health", get(health_check))
         .nest("/api/auth", features::auth::controller::router())
+        .nest("/api", features::sales::controller::router())
         .layer(CorsLayer::permissive())
         .with_state(state)
 }

@@ -80,8 +80,8 @@ export const authStorage = {
 
 export const getApiBaseUrl = () => {
   return Platform.OS === 'android'
-    ? 'http://10.0.2.2:8095'
-    : 'http://127.0.0.1:8095';
+    ? 'http://10.0.2.2:3014'
+    : 'http://127.0.0.1:3014';
 };
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);

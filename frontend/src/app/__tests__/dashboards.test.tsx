@@ -15,6 +15,7 @@ describe('Dashboard Screens', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    global.fetch = jest.fn().mockImplementation(() => new Promise(() => {}));
   });
 
   describe('SalesDashboard', () => {

@@ -1,5 +1,9 @@
 # Phase 1: Foundation & Scaffolding Implementation Plan
 
+> **Local DB (supersedes Task 1 below):** Homebrew `postgresql@17` on `5432`, user `akamaotto`, database `kwatapos`. Do not bind Docker Postgres to `5432`. See `ARCHITECTURE.md` §3.2.
+>
+> **Local HTTP (supersedes ports below):** Expo web `3011`, iOS `3012`, Android `3013`, API `3014`. Kwata range is 3011–3020; Poblysh uses 3000–3010.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Establish the technical environments, folder structures, database container, and communication between a basic Rust backend and Expo frontend using Test-Driven Development (TDD).
@@ -10,8 +14,8 @@
 
 ## Global Constraints
 
-- Backend API must run on port `8095`.
-- Expo must run web on `3010`.
+- Backend API must run on port `3014`.
+- Expo must run web on `3011`.
 - All features must follow the directories established in `ARCHITECTURE.md`.
 - No code should use `3000`.
 

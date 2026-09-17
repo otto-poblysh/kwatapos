@@ -11,7 +11,7 @@ The backend follows a **Feature-First DDD** structure implementing the **Control
 ```text
 backend/
 ├── Cargo.toml
-├── docker-compose.yml      # Defines PostgreSQL service
+├── .env                    # DATABASE_URL → Homebrew postgres://akamaotto@127.0.0.1:5432/kwatapos
 ├── src/
 │   ├── main.rs             # Application entrypoint & server bootstrap
 │   ├── config/             # Environment vars, DB connection pooling
@@ -78,40 +78,24 @@ frontend/
 To prevent conflicts with other local projects (like Next.js on port 3000), we have assigned dedicated ports for the Kwata POS ecosystem.
 
 ### 3.1 Port Assignments
-- **Backend API:** `8095`
-- **Frontend - Expo Web:** `3010`
-- **Frontend - Expo iOS:** `3011`
-- **Frontend - Expo Android:** `3012`
-- **PostgreSQL Database:** `5432` (Standard)
+- **Backend API:** `3014`
+- **Frontend - Expo Web:** `3011`
+- **Frontend - Expo iOS:** `3012`
+- **Frontend - Expo Android:** `3013`
+- **PostgreSQL Database:** Homebrew `postgresql@17` on `5432`, user `akamaotto`, database `kwatapos`
 
-*Note: Expo can be configured to run on specific ports using the `--port` flag (e.g., `npx expo start --web --port 3010`).*
+Kwata HTTP ports are **3011–3020**. Poblysh uses **3000–3010**. Do not move Expo or the API below `3011`.
 
-### 3.2 Database & Docker Setup
-We are using Docker from Day 1 to ensure environmental consistency. Since **Colima** is installed on this Mac, it will serve as the lightweight Docker runtime.
+*Note: Expo can be configured to run on specific ports using the `--port` flag (e.g., `npx expo start --web --port 3011`).*
 
-A `docker-compose.yml` in the `backend/` directory will spin up the PostgreSQL instance:
+### 3.2 Database
 
-```yaml
-version: '3.8'
-services:
-  db:
-    image: postgres:17-alpine
-    container_name: kwatapos_db
-    environment:
-      POSTGRES_USER: kwata_admin
-      POSTGRES_PASSWORD: kwata_password
-      POSTGRES_DB: kwatapos
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+Local Postgres is Homebrew `postgresql@17`. User `akamaotto` owns both `kwatapos` and Poblysh’s `poblysh` database on the same cluster. Copy `backend/.env.example` to `backend/.env`. Do not start Docker Postgres on `5432`.
 
-volumes:
-  postgres_data:
-```
-
-**To start the database:**
 ```bash
-colima start
-cd backend && docker-compose up -d
+brew services start postgresql@17
+createdb -h 127.0.0.1 -U akamaotto kwatapos   # if the database does not exist yet
+cd backend && cargo run
 ```
+
+The optional `kwatapos_db` Docker service in the repo-root `docker-compose.yml` publishes `127.0.0.1:55432` only (container user `kwata_admin`). Use it only if Homebrew is unavailable, and point `DATABASE_URL` at port `55432` in that case.
