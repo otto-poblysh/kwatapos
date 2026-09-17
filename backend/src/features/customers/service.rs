@@ -1,5 +1,7 @@
 use sqlx::PgPool;
 
+use crate::features::auth::service::hash_password;
+
 use super::{
     dto::{CreateCustomerRequest, CustomerResponse},
     repository,
@@ -67,7 +69,18 @@ pub async fn create_customer(
         ));
     }
 
-    match repository::create_customer(pool, name, phone).await {
+    let pin = payload.pin.trim();
+    if pin.len() != 4 || !pin.chars().all(|c| c.is_ascii_digit()) {
+        return Err(CustomerError::InvalidInput(
+            "PIN must be exactly 4 digits".to_string(),
+        ));
+    }
+
+    let pin_hash = hash_password(pin).map_err(|e| {
+        CustomerError::InvalidInput(format!("Failed to hash PIN: {e}"))
+    })?;
+
+    match repository::create_customer(pool, name, phone, &pin_hash).await {
         Ok(c) => Ok(CustomerResponse::from(c)),
         Err(sqlx::Error::Database(dbe)) if dbe.code().as_deref() == Some("23505") => {
             Err(CustomerError::PhoneAlreadyExists(phone.to_string()))

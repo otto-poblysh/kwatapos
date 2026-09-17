@@ -250,6 +250,7 @@ describe('SettlementModal', () => {
           body: JSON.stringify({
             name: 'Alice Wonder',
             phone_number: '+237699999999',
+            pin: '0000',
           }),
         })
       );

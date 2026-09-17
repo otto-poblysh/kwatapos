@@ -6,6 +6,7 @@ use uuid::Uuid;
 pub struct CreateCustomerRequest {
     pub name: String,
     pub phone_number: String,
+    pub pin: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

@@ -59,6 +59,7 @@ export function SettlementModal({
   const [isSearchingCustomer, setIsSearchingCustomer] = useState<boolean>(false);
   const [customerNotFound, setCustomerNotFound] = useState<boolean>(false);
   const [newCustomerName, setNewCustomerName] = useState<string>('');
+  const [newCustomerPin, setNewCustomerPin] = useState<string>('0000');
   const [isCreatingCustomer, setIsCreatingCustomer] = useState<boolean>(false);
   const [customerError, setCustomerError] = useState<string | null>(null);
 
@@ -75,6 +76,7 @@ export function SettlementModal({
       setIsSearchingCustomer(false);
       setCustomerNotFound(false);
       setNewCustomerName('');
+      setNewCustomerPin('0000');
       setIsCreatingCustomer(false);
       setCustomerError(null);
       setIsSettling(false);
@@ -129,6 +131,10 @@ export function SettlementModal({
       setCustomerError('Please enter phone number');
       return;
     }
+    if (!/^\d{4}$/.test(newCustomerPin.trim())) {
+      setCustomerError('PIN must be exactly 4 digits');
+      return;
+    }
 
     setIsCreatingCustomer(true);
     setCustomerError(null);
@@ -142,6 +148,7 @@ export function SettlementModal({
         body: JSON.stringify({
           name: trimmedName,
           phone_number: trimmedPhone,
+          pin: newCustomerPin.trim(),
         }),
       });
 
@@ -151,6 +158,7 @@ export function SettlementModal({
         setSelectedCustomer(data);
         setCustomerNotFound(false);
         setNewCustomerName('');
+        setNewCustomerPin('0000');
       } else {
         setCustomerError(data?.error || `Failed to create customer (${res.status})`);
       }
@@ -383,6 +391,18 @@ export function SettlementModal({
                                   onChangeText={setNewCustomerName}
                                   accessibilityLabel="Customer name"
                                   testID="new-customer-name-input"
+                                />
+                                <TextInput
+                                  style={styles.pinInput}
+                                  placeholder="PIN"
+                                  placeholderTextColor="#8E8E93"
+                                  value={newCustomerPin}
+                                  onChangeText={setNewCustomerPin}
+                                  keyboardType="number-pad"
+                                  maxLength={4}
+                                  secureTextEntry
+                                  accessibilityLabel="Customer PIN"
+                                  testID="new-customer-pin-input"
                                 />
                                 <TouchableOpacity
                                   style={[
@@ -704,6 +724,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#111111',
     minHeight: 40,
+  },
+  pinInput: {
+    width: 72,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    color: '#111111',
+    minHeight: 40,
+    textAlign: 'center',
   },
   createButton: {
     backgroundColor: '#000000',

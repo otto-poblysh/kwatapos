@@ -32,21 +32,46 @@ pub async fn find_by_phone(pool: &PgPool, phone: &str) -> Result<Option<Customer
     .await
 }
 
+#[derive(Debug, Clone, FromRow)]
+pub struct CustomerAuth {
+    pub id: Uuid,
+    pub name: String,
+    pub phone_number: String,
+    pub pin_hash: String,
+    pub created_at: DateTime<Utc>,
+}
+
 pub async fn create_customer(
     pool: &PgPool,
     name: &str,
     phone: &str,
+    pin_hash: &str,
 ) -> Result<Customer, sqlx::Error> {
     let clean_name = name.trim();
     let clean_phone = phone.trim();
     sqlx::query_as::<_, Customer>(
-        "INSERT INTO customers (name, phone_number) \
-         VALUES ($1, $2) \
+        "INSERT INTO customers (name, phone_number, pin_hash) \
+         VALUES ($1, $2, $3) \
          RETURNING id, name, phone_number, created_at",
     )
     .bind(clean_name)
     .bind(clean_phone)
+    .bind(pin_hash)
     .fetch_one(pool)
+    .await
+}
+
+pub async fn find_auth_by_phone(
+    pool: &PgPool,
+    phone: &str,
+) -> Result<Option<CustomerAuth>, sqlx::Error> {
+    let clean_phone = phone.trim();
+    sqlx::query_as::<_, CustomerAuth>(
+        "SELECT id, name, phone_number, pin_hash, created_at \
+         FROM customers WHERE phone_number = $1",
+    )
+    .bind(clean_phone)
+    .fetch_optional(pool)
     .await
 }
 

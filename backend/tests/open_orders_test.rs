@@ -441,6 +441,7 @@ async fn test_post_settle_order_credit_success_requires_customer_and_creates_cre
         &pool,
         "Credit Buyer",
         &format!("+2376{}", &Uuid::new_v4().simple().to_string()[..8]),
+        &backend::features::auth::service::hash_password("0000").unwrap(),
     )
     .await
     .unwrap();
@@ -730,7 +731,8 @@ async fn test_customer_api_endpoints() {
     // 1. POST /api/customers creates customer
     let create_payload = json!({
         "name": "Jane Doe",
-        "phone_number": phone
+        "phone_number": phone,
+        "pin": "0000"
     });
 
     let res_create = app

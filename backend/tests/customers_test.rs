@@ -1,5 +1,7 @@
+use backend::features::auth::service::{hash_password, verify_password};
 use backend::features::customers::repository::{
-    create_credit_tx, create_customer, find_by_id, find_by_phone, get_credits_by_customer,
+    create_credit_tx, create_customer, find_auth_by_phone, find_by_id, find_by_phone,
+    get_credits_by_customer,
 };
 use backend::features::sales::repository::create_order_tx;
 use rust_decimal::Decimal;
@@ -22,6 +24,10 @@ async fn test_pool() -> sqlx::PgPool {
     pool
 }
 
+fn default_pin_hash() -> String {
+    hash_password("0000").expect("Failed to hash default PIN")
+}
+
 #[tokio::test]
 async fn test_customer_creation_and_search_by_phone() {
     let pool = test_pool().await;
@@ -30,7 +36,7 @@ async fn test_customer_creation_and_search_by_phone() {
     let name = "Test Customer Alpha";
 
     // 1. Create customer
-    let created = create_customer(&pool, name, &phone)
+    let created = create_customer(&pool, name, &phone, &default_pin_hash())
         .await
         .expect("Failed to create customer");
 
@@ -71,7 +77,7 @@ async fn test_customer_phone_and_name_whitespace_trimming() {
     let padded_phone = format!("  {}  \n", raw_phone);
     let padded_name = "   Padded Customer Name \t ";
 
-    let created = create_customer(&pool, &padded_name, &padded_phone)
+    let created = create_customer(&pool, &padded_name, &padded_phone, &default_pin_hash())
         .await
         .expect("Failed to create customer with whitespace");
 
@@ -88,7 +94,7 @@ async fn test_customer_phone_and_name_whitespace_trimming() {
     assert_eq!(found.unwrap().id, created.id);
 
     // Duplicate phone with whitespace should fail unique constraint
-    let duplicate_result = create_customer(&pool, "Another Person", &padded_phone).await;
+    let duplicate_result = create_customer(&pool, "Another Person", &padded_phone, &default_pin_hash()).await;
     assert!(
         duplicate_result.is_err(),
         "Expected duplicate phone number to violate unique constraint"
@@ -100,7 +106,7 @@ async fn test_transactional_credit_creation_and_retrieval() {
     let pool = test_pool().await;
 
     let phone = format!("+2376{}", &Uuid::new_v4().simple().to_string()[..8]);
-    let customer = create_customer(&pool, "Credit Customer", &phone)
+    let customer = create_customer(&pool, "Credit Customer", &phone, &default_pin_hash())
         .await
         .expect("Failed to create customer");
 
@@ -138,7 +144,7 @@ async fn test_credit_negative_amount_fails_check_constraint() {
     let pool = test_pool().await;
 
     let phone = format!("+2376{}", &Uuid::new_v4().simple().to_string()[..8]);
-    let customer = create_customer(&pool, "Negative Test Customer", &phone)
+    let customer = create_customer(&pool, "Negative Test Customer", &phone, &default_pin_hash())
         .await
         .expect("Failed to create customer");
 
@@ -164,7 +170,7 @@ async fn test_credit_transaction_rollback() {
     let pool = test_pool().await;
 
     let phone = format!("+2376{}", &Uuid::new_v4().simple().to_string()[..8]);
-    let customer = create_customer(&pool, "Rollback Customer", &phone)
+    let customer = create_customer(&pool, "Rollback Customer", &phone, &default_pin_hash())
         .await
         .expect("Failed to create customer");
 
@@ -190,4 +196,27 @@ async fn test_credit_transaction_rollback() {
         credits.is_empty(),
         "Expected no credits to be persisted after rollback"
     );
+}
+
+#[tokio::test]
+async fn test_legacy_customer_default_pin_hash_verifies_0000() {
+    let pool = test_pool().await;
+    let phone = format!("+2376{}", &Uuid::new_v4().simple().to_string()[..8]);
+    let known_hash = "$argon2id$v=19$m=19456,t=2,p=1$a3dhdGFwb3NfcGluX3NhbHQ$C1iR4xIOhM/4wrDqoaYXyBm46ATY5UMuwpxXOlOZLlo";
+
+    sqlx::query("INSERT INTO customers (name, phone_number, pin_hash) VALUES ($1, $2, $3)")
+        .bind("Legacy Customer")
+        .bind(&phone)
+        .bind(known_hash)
+        .execute(&pool)
+        .await
+        .expect("Failed to insert legacy customer");
+
+    let auth = find_auth_by_phone(&pool, &phone)
+        .await
+        .expect("Failed to load customer auth")
+        .expect("Customer auth missing");
+
+    assert!(verify_password("0000", &auth.pin_hash));
+    assert!(!verify_password("1234", &auth.pin_hash));
 }
