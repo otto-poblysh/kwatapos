@@ -302,3 +302,684 @@ async fn test_increment_inventory_tx() {
         .expect("Inventory not found");
     assert_eq!(inv3.quantity, 35, "Quantity should remain unchanged after rollback");
 }
+
+use axum::{
+    body::Body,
+    http::{header, Request, StatusCode},
+};
+use http_body_util::BodyExt;
+use serde_json::{json, Value};
+use tower::ServiceExt;
+
+async fn test_app_and_pool() -> (axum::Router, sqlx::PgPool) {
+    let pool = test_pool().await;
+    let app = backend::app_with_state(backend::AppState {
+        pool: Some(pool.clone()),
+    });
+    (app, pool)
+}
+
+#[tokio::test]
+async fn test_api_create_requisition_success_and_validation() {
+    let (app, pool) = test_app_and_pool().await;
+
+    let product = create_product(&pool, "Req API Product 1", Decimal::new(650, 2), "Beverages")
+        .await
+        .unwrap();
+
+    // 1. Empty items returns 400
+    let res_empty = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/requisitions")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "title": "Weekly Restock",
+                    "items": []
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_empty.status(), StatusCode::BAD_REQUEST);
+
+    // 2. Quantity <= 0 returns 400
+    let res_zero_qty = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/requisitions")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "title": "Weekly Restock",
+                    "items": [{ "product_id": product.id, "quantity": 0, "expected_price": "650.00" }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_zero_qty.status(), StatusCode::BAD_REQUEST);
+
+    // 3. Negative expected_price returns 400
+    let res_neg_price = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/requisitions")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "title": "Weekly Restock",
+                    "items": [{ "product_id": product.id, "quantity": 10, "expected_price": "-10.00" }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_neg_price.status(), StatusCode::BAD_REQUEST);
+
+    // 4. Non-existent product returns 400
+    let res_missing_prod = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/requisitions")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "title": "Weekly Restock",
+                    "items": [{ "product_id": Uuid::new_v4(), "quantity": 10, "expected_price": "650.00" }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_missing_prod.status(), StatusCode::BAD_REQUEST);
+
+    // 5. Empty title defaults to "Stock Requisition" and returns 201
+    let res_default_title = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/requisitions")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "title": "   ",
+                    "items": [{ "product_id": product.id, "quantity": 10, "expected_price": "650.00" }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_default_title.status(), StatusCode::CREATED);
+    let body = res_default_title.into_body().collect().await.unwrap().to_bytes();
+    let json_val: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json_val["title"], "Stock Requisition");
+    assert_eq!(json_val["status"], "draft");
+    assert!(!json_val["token"].as_str().unwrap().is_empty());
+    assert_eq!(json_val["items"].as_array().unwrap().len(), 1);
+    assert_eq!(json_val["items"][0]["product_id"], product.id.to_string());
+    assert_eq!(json_val["items"][0]["product_name"], "Req API Product 1");
+    assert_eq!(json_val["items"][0]["quantity"], 10);
+
+    // 6. Explicit title returns 201
+    let res_valid = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/requisitions")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "title": "Weekly Restock",
+                    "items": [{ "product_id": product.id, "quantity": 10, "expected_price": "650.00" }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_valid.status(), StatusCode::CREATED);
+    let body_valid = res_valid.into_body().collect().await.unwrap().to_bytes();
+    let json_valid: Value = serde_json::from_slice(&body_valid).unwrap();
+    assert_eq!(json_valid["title"], "Weekly Restock");
+}
+
+#[tokio::test]
+async fn test_api_get_requisitions_list_and_details() {
+    let (app, pool) = test_app_and_pool().await;
+
+    let product = create_product(&pool, "Req API Product List", Decimal::new(500, 2), "Supplies")
+        .await
+        .unwrap();
+
+    // Create requisition
+    let res_create = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/requisitions")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "title": "List Restock",
+                    "items": [{ "product_id": product.id, "quantity": 4, "expected_price": "500.00" }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_create.status(), StatusCode::CREATED);
+    let body = res_create.into_body().collect().await.unwrap().to_bytes();
+    let created: Value = serde_json::from_slice(&body).unwrap();
+    let req_id = created["id"].as_str().unwrap();
+
+    // 1. GET /api/requisitions returns 200 with list including item_count and total_estimated_cost
+    let res_list = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/requisitions")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_list.status(), StatusCode::OK);
+    let list_body = res_list.into_body().collect().await.unwrap().to_bytes();
+    let list_json: Value = serde_json::from_slice(&list_body).unwrap();
+    assert!(list_json.is_array());
+    let found = list_json
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["id"] == req_id)
+        .expect("Created requisition should be in list");
+    assert_eq!(found["title"], "List Restock");
+    assert_eq!(found["item_count"], 1);
+    assert_eq!(found["total_estimated_cost"], "2000.00");
+
+    // 2. GET /api/requisitions/:id returns 200 with details and product name
+    let res_details = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!("/api/requisitions/{}", req_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_details.status(), StatusCode::OK);
+    let details_body = res_details.into_body().collect().await.unwrap().to_bytes();
+    let details_json: Value = serde_json::from_slice(&details_body).unwrap();
+    assert_eq!(details_json["id"], req_id);
+    assert_eq!(details_json["items"][0]["product_name"], "Req API Product List");
+
+    // 3. GET non-existent returns 404
+    let res_not_found = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!("/api/requisitions/{}", Uuid::new_v4()))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_not_found.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn test_api_share_requisition() {
+    let (app, pool) = test_app_and_pool().await;
+
+    let product = create_product(&pool, "Req Share Product", Decimal::new(200, 2), "Food")
+        .await
+        .unwrap();
+
+    let res_create = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/requisitions")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "title": "Share Test",
+                    "items": [{ "product_id": product.id, "quantity": 5, "expected_price": "200.00" }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = res_create.into_body().collect().await.unwrap().to_bytes();
+    let created: Value = serde_json::from_slice(&body).unwrap();
+    let req_id = created["id"].as_str().unwrap();
+    let token = created["token"].as_str().unwrap();
+
+    // 1. Share requisition transitions to 'sent' and returns share_url
+    let res_share = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/share", req_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_share.status(), StatusCode::OK);
+    let share_body = res_share.into_body().collect().await.unwrap().to_bytes();
+    let share_json: Value = serde_json::from_slice(&share_body).unwrap();
+    assert_eq!(share_json["id"], req_id);
+    assert_eq!(share_json["token"], token);
+    assert_eq!(share_json["status"], "sent");
+    assert!(
+        share_json["share_url"].as_str().unwrap().contains(token),
+        "share_url must contain the token"
+    );
+
+    // 2. Non-existent returns 404
+    let res_404 = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/share", Uuid::new_v4()))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_404.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn test_api_public_vendor_flow() {
+    let (app, pool) = test_app_and_pool().await;
+
+    let product = create_product(&pool, "Req Vendor Product", Decimal::new(650, 2), "Food")
+        .await
+        .unwrap();
+
+    let res_create = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/requisitions")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "title": "Vendor Flow",
+                    "items": [{ "product_id": product.id, "quantity": 10, "expected_price": "650.00" }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = res_create.into_body().collect().await.unwrap().to_bytes();
+    let created: Value = serde_json::from_slice(&body).unwrap();
+    let token = created["token"].as_str().unwrap();
+    let item_id = created["items"][0]["id"].as_str().unwrap();
+
+    // 1. GET /api/public/requisition/:token returns public review data
+    let res_pub_get = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!("/api/public/requisition/{}", token))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_pub_get.status(), StatusCode::OK);
+    let pub_get_body = res_pub_get.into_body().collect().await.unwrap().to_bytes();
+    let pub_get_json: Value = serde_json::from_slice(&pub_get_body).unwrap();
+    assert_eq!(pub_get_json["token"], token);
+    assert_eq!(pub_get_json["items"][0]["product_name"], "Req Vendor Product");
+    assert_eq!(pub_get_json["items"][0]["quantity"], 10);
+    assert_eq!(pub_get_json["items"][0]["expected_price"], "650.00");
+    assert_eq!(pub_get_json["items"][0]["confirmed_price"], Value::Null);
+
+    // 2. GET invalid token returns 404
+    let res_pub_404 = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!("/api/public/requisition/{}", Uuid::new_v4()))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_pub_404.status(), StatusCode::NOT_FOUND);
+
+    // 3. POST /api/public/requisition/:token updates confirmed prices and sets status to 'accepted'
+    let res_pub_post = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/public/requisition/{}", token))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [{ "item_id": item_id, "confirmed_price": "700.00" }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_pub_post.status(), StatusCode::OK);
+    let pub_post_body = res_pub_post.into_body().collect().await.unwrap().to_bytes();
+    let pub_post_json: Value = serde_json::from_slice(&pub_post_body).unwrap();
+    assert_eq!(pub_post_json["status"], "accepted");
+    assert_eq!(pub_post_json["items"][0]["confirmed_price"], "700.00");
+
+    // 4. POST with invalid item returns 400
+    let res_invalid_item = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/public/requisition/{}", token))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [{ "item_id": Uuid::new_v4(), "confirmed_price": "700.00" }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_invalid_item.status(), StatusCode::BAD_REQUEST);
+
+    // 5. POST non-existent token returns 404
+    let res_post_404 = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/public/requisition/{}", Uuid::new_v4()))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [{ "item_id": item_id, "confirmed_price": "700.00" }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_post_404.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn test_api_deliver_requisition_flow() {
+    let (app, pool) = test_app_and_pool().await;
+
+    let p1 = create_product(&pool, "Req Deliver P1", Decimal::new(100, 2), "Beverages")
+        .await
+        .unwrap();
+    let p2 = create_product(&pool, "Req Deliver P2", Decimal::new(200, 2), "Beverages")
+        .await
+        .unwrap();
+
+    let res_create = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/requisitions")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "title": "Deliver Flow",
+                    "items": [
+                        { "product_id": p1.id, "quantity": 10, "expected_price": "100.00" },
+                        { "product_id": p2.id, "quantity": 5, "expected_price": "200.00" }
+                    ]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = res_create.into_body().collect().await.unwrap().to_bytes();
+    let created: Value = serde_json::from_slice(&body).unwrap();
+    let req_id = created["id"].as_str().unwrap();
+    let item1_id = created["items"][0]["id"].as_str().unwrap();
+    let item2_id = created["items"][1]["id"].as_str().unwrap();
+
+    // 1. Requisition in 'draft' cannot be delivered (must be sent or accepted)
+    let res_draft_deliver = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/deliver", req_id))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [
+                        { "item_id": item1_id, "received_quantity": 8 },
+                        { "item_id": item2_id, "received_quantity": 5 }
+                    ]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_draft_deliver.status(), StatusCode::BAD_REQUEST);
+
+    // Share to transition to 'sent'
+    let _ = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/share", req_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    // 2. Partial delivery: item1 received 8 (< 10), item2 received 5 (== 5)
+    let res_partial = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/deliver", req_id))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [
+                        { "item_id": item1_id, "received_quantity": 8 },
+                        { "item_id": item2_id, "received_quantity": 5 }
+                    ]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_partial.status(), StatusCode::OK);
+    let partial_body = res_partial.into_body().collect().await.unwrap().to_bytes();
+    let partial_json: Value = serde_json::from_slice(&partial_body).unwrap();
+    assert_eq!(partial_json["status"], "partial_delivery");
+
+    // Check inventory increased
+    let inv1 = backend::features::inventory::repository::get_inventory(&pool, p1.id).await.unwrap().unwrap();
+    assert_eq!(inv1.quantity, 8);
+    let inv2 = backend::features::inventory::repository::get_inventory(&pool, p2.id).await.unwrap().unwrap();
+    assert_eq!(inv2.quantity, 5);
+
+    // 3. Full delivery on remaining (or deliver when all >= quantity):
+    // Deliver 10 for item 1, 5 for item 2
+    let res_full = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/deliver", req_id))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [
+                        { "item_id": item1_id, "received_quantity": 10 },
+                        { "item_id": item2_id, "received_quantity": 5 }
+                    ]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_full.status(), StatusCode::OK);
+    let full_body = res_full.into_body().collect().await.unwrap().to_bytes();
+    let full_json: Value = serde_json::from_slice(&full_body).unwrap();
+    assert_eq!(full_json["status"], "delivered");
+
+    // Inventory incremented by 10 and 5
+    let inv1_after = backend::features::inventory::repository::get_inventory(&pool, p1.id).await.unwrap().unwrap();
+    assert_eq!(inv1_after.quantity, 18);
+
+    // 4. Deliver on already 'delivered' requisition returns 400
+    let res_already_deliv = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/deliver", req_id))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [
+                        { "item_id": item1_id, "received_quantity": 10 }
+                    ]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_already_deliv.status(), StatusCode::BAD_REQUEST);
+
+    // 5. Negative received_quantity returns 400
+    // Create another sent requisition
+    let res_create2 = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/requisitions")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "title": "Neg Test",
+                    "items": [{ "product_id": p1.id, "quantity": 10, "expected_price": "100.00" }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body2 = res_create2.into_body().collect().await.unwrap().to_bytes();
+    let created2: Value = serde_json::from_slice(&body2).unwrap();
+    let req2_id = created2["id"].as_str().unwrap();
+    let item_neg_id = created2["items"][0]["id"].as_str().unwrap();
+    let _ = app.clone().oneshot(
+        Request::builder().method("POST").uri(format!("/api/requisitions/{}/share", req2_id)).body(Body::empty()).unwrap(),
+    ).await.unwrap();
+
+    let res_neg_recv = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/deliver", req2_id))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [{ "item_id": item_neg_id, "received_quantity": -1 }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_neg_recv.status(), StatusCode::BAD_REQUEST);
+
+    // 6. Deliver non-existent returns 404
+    let res_deliv_404 = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/deliver", Uuid::new_v4()))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "items": [{ "item_id": item1_id, "received_quantity": 5 }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_deliv_404.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn test_api_pay_requisition() {
+    let (app, pool) = test_app_and_pool().await;
+
+    let p = create_product(&pool, "Req Pay Prod", Decimal::new(150, 2), "Food")
+        .await
+        .unwrap();
+
+    let res_create = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/requisitions")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&json!({
+                    "title": "Pay Test",
+                    "items": [{ "product_id": p.id, "quantity": 10, "expected_price": "150.00" }]
+                })).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = res_create.into_body().collect().await.unwrap().to_bytes();
+    let created: Value = serde_json::from_slice(&body).unwrap();
+    let req_id = created["id"].as_str().unwrap();
+
+    // 1. Pay transitions status to 'paid'
+    let res_pay = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/pay", req_id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_pay.status(), StatusCode::OK);
+    let pay_body = res_pay.into_body().collect().await.unwrap().to_bytes();
+    let pay_json: Value = serde_json::from_slice(&pay_body).unwrap();
+    assert_eq!(pay_json["status"], "paid");
+
+    // 2. Pay non-existent returns 404
+    let res_pay_404 = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/requisitions/{}/pay", Uuid::new_v4()))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res_pay_404.status(), StatusCode::NOT_FOUND);
+}
+

@@ -109,3 +109,23 @@ pub async fn attach_receipt(
     .fetch_one(pool)
     .await
 }
+
+pub async fn attach_receipt_and_update_status(
+    pool: &PgPool,
+    id: Uuid,
+    receipt_image_url: &str,
+    status: &str,
+) -> Result<Option<DirectExpense>, sqlx::Error> {
+    sqlx::query_as::<_, DirectExpense>(
+        "UPDATE direct_expenses \
+         SET receipt_image_url = $2, status = $3, updated_at = NOW() \
+         WHERE id = $1 \
+         RETURNING id, requested_by, category, amount, status, receipt_image_url, notes, created_at, updated_at",
+    )
+    .bind(id)
+    .bind(receipt_image_url)
+    .bind(status)
+    .fetch_optional(pool)
+    .await
+}
+

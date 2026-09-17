@@ -238,3 +238,51 @@ pub async fn increment_inventory_tx(
 
     Ok(())
 }
+
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize, PartialEq)]
+pub struct RequisitionSummary {
+    pub id: Uuid,
+    pub token: Uuid,
+    pub title: String,
+    pub status: String,
+    pub item_count: i64,
+    pub total_estimated_cost: Decimal,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+pub async fn get_requisition_summaries(
+    pool: &PgPool,
+) -> Result<Vec<RequisitionSummary>, sqlx::Error> {
+    sqlx::query_as::<_, RequisitionSummary>(
+        "SELECT \
+             r.id, \
+             r.token, \
+             r.title, \
+             r.status, \
+             COALESCE(COUNT(ri.id), 0)::BIGINT AS item_count, \
+             COALESCE(SUM(ri.quantity * ri.expected_price), 0)::NUMERIC AS total_estimated_cost, \
+             r.created_at, \
+             r.updated_at \
+         FROM requisitions r \
+         LEFT JOIN requisition_items ri ON ri.requisition_id = r.id \
+         GROUP BY r.id \
+         ORDER BY r.created_at DESC",
+    )
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn get_requisition_by_token_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    token: Uuid,
+) -> Result<Option<Requisition>, sqlx::Error> {
+    sqlx::query_as::<_, Requisition>(
+        "SELECT id, token, title, status, created_at, updated_at \
+         FROM requisitions WHERE token = $1",
+    )
+    .bind(token)
+    .fetch_optional(&mut **tx)
+    .await
+}
+
