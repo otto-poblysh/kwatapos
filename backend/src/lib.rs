@@ -5,6 +5,7 @@ use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
+pub mod core;
 pub mod features;
 
 /// Homebrew `postgresql@17` on 5432, shared with Poblysh as user `akamaotto`.
@@ -51,6 +52,7 @@ pub fn app_with_state(state: AppState) -> Router {
         .nest("/api/requisitions", features::requisitions::controller::router())
         .nest("/api/public/requisition", features::requisitions::controller::public_router())
         .nest("/api/expenses", features::expenses::controller::router())
+        .nest("/api/admin", features::admin::controller::router())
         .nest("/api", features::sales::controller::router())
         .layer(CorsLayer::permissive())
         .with_state(state)
